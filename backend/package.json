@@ -8,6 +8,7 @@
     "dev": "node --import tsx --watch src/index.ts"
   },
   "dependencies": {
+    "@scure/bip39": "^1.6.0",
     "@iota/identity-wasm": "beta",
     "@iota/iota-interaction-ts": "^0.11.0",
     "@iota/iota-sdk": "^1.11.0",

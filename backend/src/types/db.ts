@@ -1,5 +1,7 @@
 export type PermissionProfile = "readonly" | "low_value" | "full_access";
 
+export type AgentStatus = "pending_activation" | "active" | "revoked";
+
 export type DbUser = {
   googleId: string;
   email: string;
@@ -9,6 +11,17 @@ export type DbUser = {
   didDocument: Record<string, unknown>;
   /** Digest della transaction block on-chain di `createIdentity` (IOTA). Assente per utenti creati prima di questo campo. */
   DIDCreationTx?: string;
+  /** Come è stato pagato il gas alla creazione (master firma la tx; VM = chiave utente). */
+  didGasMode?: "master_payer" | "sponsored";
+  /** Tx digest dell’airdrop di benvenuto (se inviato). */
+  airdropTxHash?: string;
+  /** Indirizzo IOTA (sender on-chain) derivato dalla stessa keypair del DID. */
+  walletAddress?: string;
+  encryptedPrivateKey?: string;
+  iv?: string;
+  salt?: string;
+  /** Prossimo indice per derivazione HKDF degli agenti (0-based). */
+  nextAgentIndex?: number;
   createdAt: string;
 };
 
@@ -17,18 +30,39 @@ export type AgentTaskType = "balance_monitor" | "shipment_monitor";
 export type AgentTaskConfig = {
   shipmentId: string;
   action: "release_payment";
+  recipientAddress?: string;
+  amountNanos?: number;
 };
 
 export type DbAgent = {
   agentDid: string;
+  /** Nome scelto dall'utente in dashboard. */
+  name?: string;
+  /** Descrizione opzionale mostrata in elenco. */
+  description?: string;
   ownerDid: string;
   ownerGoogleId: string;
   permissionProfile: PermissionProfile;
-  encryptedPrivateKey: string;
-  iv: string;
-  salt: string;
+  /** Indirizzo IOTA derivato dalla chiave Ed25519 dell’agente (VM #key-1). */
+  walletAddress?: string;
+  DIDCreationTx?: string;
+  /** Legacy: agenti creati prima del bridge (chiave cifrata). */
+  encryptedPrivateKey?: string;
+  iv?: string;
+  salt?: string;
+  /** Bridge: token per Authorization Bearer. */
+  agentToken?: string;
+  /** Indice usato in HKDF (derivazione deterministica). */
+  agentIndex?: number;
+  permitObjectId?: string | null;
+  status?: AgentStatus;
+  activatedAt?: string | null;
+  /** Budget giornaliero (nanos), reset per data UTC. */
+  spentTodayNanos?: string;
+  spentTodayDate?: string;
   createdAt: string;
-  active: boolean;
+  /** Legacy: usare `status`. */
+  active?: boolean;
   taskType?: AgentTaskType;
   taskConfig?: AgentTaskConfig;
 };

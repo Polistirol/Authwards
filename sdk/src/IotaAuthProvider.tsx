@@ -17,8 +17,13 @@ export type IotaAuthContextValue = {
   user: User | null;
   token: string | null;
   loading: boolean;
+  /** Solo al primo login OAuth: mnemonic di recovery (una tantum finché non fai logout). */
+  recoveryPhrase: string | null;
+  isFirstLogin: boolean;
   login: () => void;
   logout: () => void;
+  /** Dopo il welcome: azzera recovery e first-login in memoria (non persiste in storage). */
+  acknowledgeFirstLogin: () => void;
 };
 
 export const IotaAuthContext = createContext<IotaAuthContextValue | null>(null);
@@ -53,6 +58,8 @@ export function IotaAuthProvider({ backendUrl, children }: IotaAuthProviderProps
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recoveryPhrase, setRecoveryPhrase] = useState<string | null>(null);
+  const [isFirstLogin, setIsFirstLogin] = useState(false);
 
   const login = useCallback(() => {
     const returnTo = encodeURIComponent(window.location.href);
@@ -67,6 +74,13 @@ export function IotaAuthProvider({ backendUrl, children }: IotaAuthProviderProps
     }
     setToken(null);
     setUser(null);
+    setRecoveryPhrase(null);
+    setIsFirstLogin(false);
+  }, []);
+
+  const acknowledgeFirstLogin = useCallback(() => {
+    setRecoveryPhrase(null);
+    setIsFirstLogin(false);
   }, []);
 
   useEffect(() => {
@@ -76,9 +90,25 @@ export function IotaAuthProvider({ backendUrl, children }: IotaAuthProviderProps
       try {
         const params = new URLSearchParams(window.location.search);
         const urlToken = params.get("token");
+        const recoveryParam = params.get("recovery");
+        const firstLoginParam = params.get("firstLogin");
+        const shouldCleanUrl =
+          Boolean(urlToken) || params.has("recovery") || params.has("firstLogin");
+
         if (urlToken) {
           sessionStorage.setItem(SESSION_KEY, urlToken);
           params.delete("token");
+        }
+        if (recoveryParam) {
+          setRecoveryPhrase(recoveryParam);
+        }
+        if (firstLoginParam === "true") {
+          setIsFirstLogin(true);
+        }
+        params.delete("recovery");
+        params.delete("firstLogin");
+
+        if (shouldCleanUrl) {
           const qs = params.toString();
           const next =
             window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
@@ -134,10 +164,13 @@ export function IotaAuthProvider({ backendUrl, children }: IotaAuthProviderProps
       user,
       token,
       loading,
+      recoveryPhrase,
+      isFirstLogin,
       login,
       logout,
+      acknowledgeFirstLogin,
     }),
-    [backendUrl, user, token, loading, login, logout],
+    [backendUrl, user, token, loading, recoveryPhrase, isFirstLogin, login, logout, acknowledgeFirstLogin],
   );
 
   return <IotaAuthContext.Provider value={value}>{children}</IotaAuthContext.Provider>;

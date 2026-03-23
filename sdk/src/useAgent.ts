@@ -1,22 +1,39 @@
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 
-import { normalizeAgentLog, normalizeAgentLogList } from "./agentLogUtils";
+import { normalizeAgentLogList } from "./agentLogUtils";
 import { IotaAuthContext } from "./IotaAuthProvider";
 import type { Agent, AgentLog } from "./types";
-
-const WS_URL = "ws://localhost:8080";
-const POLL_MS = 3000;
 
 function trimTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
+export type CreateAgentResult = {
+  agentDid: string;
+  walletAddress: string;
+  agentToken: string;
+  permissionProfile: string;
+  status: string;
+  name: string;
+  description: string;
+};
+
+export type CreateAgentInput = {
+  permissionProfile: string;
+  name: string;
+  description: string;
+};
+
 export type UseAgentResult = {
   agents: Agent[];
   loading: boolean;
-  createAgent: (profile: string) => Promise<void>;
+  /** Ricarica la lista (es. dopo revoke). */
+  refreshAgents: () => Promise<void>;
+  createAgent: (input: CreateAgentInput) => Promise<CreateAgentResult | null>;
   agentLogs: Map<string, AgentLog[]>;
-  connectLogs: (agentDid: string) => void;
+  /** Carica log statici da GET /agent/logs/:agentDid (nessun WebSocket). */
+  fetchAgentLogs: (agentDid: string) => Promise<void>;
+  revokeAgent: (agentDid: string) => Promise<boolean>;
 };
 
 export function useAgent(): UseAgentResult {
@@ -30,67 +47,59 @@ export function useAgent(): UseAgentResult {
   const [loading, setLoading] = useState(false);
   const [agentLogs, setAgentLogs] = useState<Map<string, AgentLog[]>>(new Map());
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const connectTargetRef = useRef<string | null>(null);
-
   const authHeaders = useCallback((): HeadersInit => {
     const h: Record<string, string> = {};
     if (token) h.Authorization = `Bearer ${token}`;
     return h;
   }, [token]);
 
-  const loadAgents = useCallback(async (): Promise<void> => {
-    if (!token) {
-      setAgents([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch(`${trimTrailingSlash(backendUrl)}/agent/list`, {
-        headers: authHeaders(),
-      });
-      if (!res.ok) {
-        console.error("[@iota-auth/sdk] GET /agent/list failed:", res.status, await res.text());
+  const loadAgents = useCallback(
+    async (silent = false): Promise<void> => {
+      if (!token) {
         setAgents([]);
         return;
       }
-      const data: unknown = await res.json();
-      if (!Array.isArray(data)) {
+      if (!silent) setLoading(true);
+      try {
+        const res = await fetch(`${trimTrailingSlash(backendUrl)}/agent/list`, {
+          headers: authHeaders(),
+        });
+        if (!res.ok) {
+          console.error("[@iota-auth/sdk] GET /agent/list failed:", res.status, await res.text());
+          setAgents([]);
+          return;
+        }
+        const data: unknown = await res.json();
+        if (!Array.isArray(data)) {
+          setAgents([]);
+          return;
+        }
+        setAgents(data as Agent[]);
+      } catch (e) {
+        console.error("[@iota-auth/sdk] GET /agent/list error:", e);
         setAgents([]);
-        return;
+      } finally {
+        if (!silent) setLoading(false);
       }
-      setAgents(data as Agent[]);
-    } catch (e) {
-      console.error("[@iota-auth/sdk] GET /agent/list error:", e);
-      setAgents([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [backendUrl, token, authHeaders]);
+    },
+    [backendUrl, token, authHeaders],
+  );
 
-  useEffect(() => {
-    void loadAgents();
+  const refreshAgents = useCallback(async (): Promise<void> => {
+    await loadAgents(true);
   }, [loadAgents]);
 
-  const mergeLogsForAgent = useCallback((agentDid: string, incoming: AgentLog[]): void => {
-    setAgentLogs((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(agentDid) ?? [];
-      const seen = new Set(existing.map((l) => `${l.timestamp}\0${l.type}\0${JSON.stringify(l.data)}`));
-      const merged = [...existing];
-      for (const log of incoming) {
-        const key = `${log.timestamp}\0${log.type}\0${JSON.stringify(log.data)}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          merged.push(log);
-        }
-      }
-      merged.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-      next.set(agentDid, merged);
-      return next;
-    });
-  }, []);
+  useEffect(() => {
+    void loadAgents(false);
+  }, [loadAgents]);
+
+  useEffect(() => {
+    if (!token) return;
+    const id = setInterval(() => {
+      void loadAgents(true);
+    }, 15_000);
+    return () => clearInterval(id);
+  }, [token, loadAgents]);
 
   const setLogsReplace = useCallback((agentDid: string, logs: AgentLog[]): void => {
     setAgentLogs((prev) => {
@@ -100,7 +109,7 @@ export function useAgent(): UseAgentResult {
     });
   }, []);
 
-  const fetchLogsOnce = useCallback(
+  const fetchAgentLogs = useCallback(
     async (agentDid: string): Promise<void> => {
       if (!token) return;
       try {
@@ -122,109 +131,55 @@ export function useAgent(): UseAgentResult {
     [backendUrl, token, authHeaders, setLogsReplace],
   );
 
-  const stopLogTransport = useCallback((): void => {
-    if (wsRef.current) {
-      wsRef.current.onopen = null;
-      wsRef.current.onmessage = null;
-      wsRef.current.onerror = null;
-      wsRef.current.onclose = null;
-      try {
-        wsRef.current.close();
-      } catch {
-        /* ignore */
-      }
-      wsRef.current = null;
-    }
-    if (pollRef.current !== null) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
-  const connectLogs = useCallback(
-    (agentDid: string): void => {
-      connectTargetRef.current = agentDid;
-      stopLogTransport();
-
-      let pollingStarted = false;
-
-      const startPolling = (): void => {
-        if (pollingStarted) return;
-        pollingStarted = true;
-        stopLogTransport();
-        void fetchLogsOnce(agentDid);
-        pollRef.current = setInterval(() => {
-          void fetchLogsOnce(agentDid);
-        }, POLL_MS);
-      };
-
-      try {
-        const ws = new WebSocket(WS_URL);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          pollingStarted = false;
-        };
-
-        ws.onmessage = (ev: MessageEvent<string>) => {
-          if (connectTargetRef.current !== agentDid) return;
-          try {
-            const parsed: unknown = JSON.parse(ev.data as string);
-            const batch = Array.isArray(parsed) ? parsed : [parsed];
-            for (const item of batch) {
-              const log = normalizeAgentLog(item);
-              if (log) mergeLogsForAgent(log.agentDid, [log]);
-            }
-          } catch (e) {
-            console.error("[@iota-auth/sdk] WebSocket message parse error:", e);
-          }
-        };
-
-        ws.onerror = () => {
-          console.error("[@iota-auth/sdk] WebSocket error; falling back to polling");
-          startPolling();
-        };
-
-        ws.onclose = (ev) => {
-          if (connectTargetRef.current !== agentDid) return;
-          if (!ev.wasClean && wsRef.current === ws) {
-            console.error("[@iota-auth/sdk] WebSocket closed unexpectedly; falling back to polling");
-            startPolling();
-          }
-        };
-      } catch (e) {
-        console.error("[@iota-auth/sdk] WebSocket constructor failed:", e);
-        startPolling();
-      }
-    },
-    [stopLogTransport, fetchLogsOnce, mergeLogsForAgent],
-  );
-
-  useEffect(() => {
-    return () => {
-      stopLogTransport();
-    };
-  }, [stopLogTransport]);
-
   const createAgent = useCallback(
-    async (profile: string): Promise<void> => {
+    async (input: CreateAgentInput): Promise<CreateAgentResult | null> => {
       if (!token) {
         console.error("[@iota-auth/sdk] createAgent: not authenticated");
-        return;
+        return null;
       }
       try {
         const res = await fetch(`${trimTrailingSlash(backendUrl)}/agent/create`, {
           method: "POST",
           headers: { ...authHeaders(), "Content-Type": "application/json" },
-          body: JSON.stringify({ permissionProfile: profile }),
+          body: JSON.stringify({
+            permissionProfile: input.permissionProfile,
+            name: input.name.trim(),
+            description: input.description.trim(),
+          }),
         });
         if (!res.ok) {
           console.error("[@iota-auth/sdk] POST /agent/create failed:", res.status, await res.text());
-          return;
+          return null;
         }
-        await loadAgents();
+        const json = (await res.json()) as CreateAgentResult;
+        await loadAgents(true);
+        return json;
       } catch (e) {
         console.error("[@iota-auth/sdk] POST /agent/create error:", e);
+        return null;
+      }
+    },
+    [backendUrl, token, authHeaders, loadAgents],
+  );
+
+  const revokeAgent = useCallback(
+    async (agentDid: string): Promise<boolean> => {
+      if (!token) return false;
+      try {
+        const res = await fetch(`${trimTrailingSlash(backendUrl)}/bridge/revoke`, {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ agentDid }),
+        });
+        if (!res.ok) {
+          console.error("[@iota-auth/sdk] POST /bridge/revoke failed:", res.status, await res.text());
+          return false;
+        }
+        await loadAgents(true);
+        return true;
+      } catch (e) {
+        console.error("[@iota-auth/sdk] POST /bridge/revoke error:", e);
+        return false;
       }
     },
     [backendUrl, token, authHeaders, loadAgents],
@@ -233,8 +188,10 @@ export function useAgent(): UseAgentResult {
   return {
     agents,
     loading,
+    refreshAgents,
     createAgent,
     agentLogs,
-    connectLogs,
+    fetchAgentLogs,
+    revokeAgent,
   };
 }

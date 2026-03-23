@@ -4,6 +4,7 @@ import { decodeIotaPrivateKey } from "@iota/iota-sdk/cryptography";
 import { requestIotaFromFaucetV0 } from "@iota/iota-sdk/faucet";
 import type { IotaTransactionBlockResponse } from "@iota/iota-sdk/client";
 import { IotaClient } from "@iota/iota-sdk/client";
+import { getMasterKeypair } from "./masterWallet.js";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 import { Ed25519KeypairSigner } from "@iota/iota-interaction-ts/node/test_utils/ed_25519_keypair_signer.js";
 import {
@@ -120,19 +121,22 @@ async function attachExternalEd25519Method(
 async function createIdentityClientFromKeypair(
   iotaClient: IotaClient,
   payerKeypair: Ed25519Keypair,
-  fund: boolean,
+  options: { fundFromFaucet: boolean },
 ): Promise<IdentityClient> {
   const userAddress = payerKeypair.getPublicKey().toIotaAddress();
-  if (fund) {
+  if (options.fundFromFaucet) {
     await fundAddress(iotaClient, userAddress);
-  } else {
-    const { totalBalance } = await iotaClient.getBalance({ owner: userAddress });
-    if (BigInt(totalBalance) === 0n) await fundAddress(iotaClient, userAddress);
   }
   // @iota/iota-interaction-ts tipizza il client come build CJS; qui forziamo compatibilità runtime.
   const readOnly = await IdentityClientReadOnly.create(iotaClient as never);
   const txSigner = new Ed25519KeypairSigner(payerKeypair as never);
   return IdentityClient.create(readOnly, txSigner);
+}
+
+function getDidGasBudget(): bigint {
+  const raw = process.env.DID_GAS_BUDGET;
+  if (raw?.trim()) return BigInt(raw.trim());
+  return 100_000_000n;
 }
 
 async function getChainId(client: IotaClient): Promise<string> {
@@ -143,57 +147,98 @@ async function getChainId(client: IotaClient): Promise<string> {
 /**
  * Crea un DID su IOTA. Il parametro `publicKey` è l’`Ed25519Keypair` dell’SDK IOTA (chiave completa):
  * la parte pubblica entra nel DID Document; la parte privata serve solo in memoria per firmare `createIdentity`.
+ * Gas: **wallet master** firma ed esegue la tx (`IdentityClient` = master). Il DID document contiene la VM dell’utente.
+ * (Le tx `withSender`+`withGasOwner` richiedono 2 firme; `buildAndExecute` ne fornisce una → non usate.)
  */
-export async function createDid(publicKey: Ed25519Keypair): Promise<{
+export async function createDid(
+  publicKey: Ed25519Keypair,
+  options?: { mnemonic?: string },
+): Promise<{
   did: string;
   didDocument: Record<string, unknown>;
   DIDCreationTx: string;
+  walletAddress: string;
+  privateKeyHex: string;
+  mnemonic: string | null;
+  didGasMode: "master_payer";
 }> {
   ensureWasm();
+  const walletAddress = publicKey.getPublicKey().toIotaAddress();
+  const { secretKey } = decodeIotaPrivateKey(publicKey.getSecretKey());
+  const privateKeyHex = Buffer.from(secretKey).toString("hex");
+  const mnemonic = options?.mnemonic ?? null;
+
   const iotaClient = new IotaClient({ url: getNodeUrl() });
   const storage = new Storage(new JwkMemStore(), new KeyIdMemStore());
-  const identityClient = await createIdentityClientFromKeypair(iotaClient, publicKey, true);
+  const masterKp = getMasterKeypair();
+  const identityClient = await createIdentityClientFromKeypair(iotaClient, masterKp, {
+    fundFromFaucet: false,
+  });
   const networkId = await getChainId(iotaClient);
   const privateJwk = iotaEd25519KeypairToIdentityJwk(publicKey);
   const unpublished = new IotaDocument(networkId);
   await attachExternalEd25519Method(storage, unpublished, privateJwk, "#key-1");
-  const { output: identity, response: rawRes } = await identityClient
-    .createIdentity(unpublished)
-    .finish()
+
+  console.log(
+    "[did] Creazione DID utente: gas mode = master_payer (opzione C: firma+gas dal master, VM = chiave utente)",
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const txb: any = identityClient.createIdentity(unpublished).finish();
+  const { output: identity, response: rawRes } = await txb
+    .withGasBudget(getDidGasBudget())
     .buildAndExecute(identityClient);
   const tx = unwrapTxResponse(rawRes);
   const doc = identity.didDocument();
   const did = doc.id().toString();
   const didDocument = doc.toJSON() as Record<string, unknown>;
-  return { did, didDocument, DIDCreationTx: tx.digest };
+  return {
+    did,
+    didDocument,
+    DIDCreationTx: tx.digest,
+    walletAddress,
+    privateKeyHex,
+    mnemonic,
+    didGasMode: "master_payer",
+  };
 }
 
-/** Agente: VM con chiave Node Ed25519; controller = DID utente; gas da `payerKeypair`. */
+/** Agente: VM agente + controller utente; firma e gas dal master (opzione C). */
 export async function createAgentDid(params: {
-  payerKeypair: Ed25519Keypair;
-  agentPrivateKey: KeyObject;
+  agentKeypair: Ed25519Keypair;
   ownerDid: string;
-  fundPayer: boolean;
-}): Promise<{ did: string; didDocument: Record<string, unknown> }> {
+}): Promise<{ did: string; didDocument: Record<string, unknown>; walletAddress: string; DIDCreationTx: string }> {
   ensureWasm();
-  const { payerKeypair, agentPrivateKey, ownerDid, fundPayer } = params;
+  const { agentKeypair, ownerDid } = params;
+  const walletAddress = agentKeypair.getPublicKey().toIotaAddress();
+
   const iotaClient = new IotaClient({ url: getNodeUrl() });
   const storage = new Storage(new JwkMemStore(), new KeyIdMemStore());
-  const identityClient = await createIdentityClientFromKeypair(iotaClient, payerKeypair, fundPayer);
+  const masterKp = getMasterKeypair();
+  const identityClient = await createIdentityClientFromKeypair(iotaClient, masterKp, {
+    fundFromFaucet: false,
+  });
   const networkId = await getChainId(iotaClient);
   const ownerIotaDid = IotaDID.parse(ownerDid);
-  const agentJwk = ed25519PrivateKeyToJwk(agentPrivateKey);
+  const agentJwk = iotaEd25519KeypairToIdentityJwk(agentKeypair);
   const unpublished = new IotaDocument(networkId);
   unpublished.setController([ownerIotaDid]);
   await attachExternalEd25519Method(storage, unpublished, agentJwk, "#key-1");
-  const { output: identity } = await identityClient
-    .createIdentity(unpublished)
-    .finish()
+
+  console.log(
+    "[did] Creazione DID agente: gas mode = master_payer (opzione C: firma+gas dal master, VM = chiave agente)",
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const txb: any = identityClient.createIdentity(unpublished).finish();
+  const { output: identity, response: rawRes } = await txb
+    .withGasBudget(getDidGasBudget())
     .buildAndExecute(identityClient);
+  const tx = unwrapTxResponse(rawRes);
   const doc = identity.didDocument();
   return {
     did: doc.id().toString(),
     didDocument: doc.toJSON() as Record<string, unknown>,
+    walletAddress,
+    DIDCreationTx: tx.digest,
   };
 }
 

@@ -8,6 +8,10 @@ export type DbUser = {
   did: string;
   didDocument: Record<string, unknown>;
   DIDCreationTx?: string;
+  walletAddress?: string;
+  encryptedPrivateKey?: string;
+  iv?: string;
+  salt?: string;
   createdAt: string;
 };
 
@@ -23,6 +27,7 @@ export type DbAgent = {
   ownerDid: string;
   ownerGoogleId: string;
   permissionProfile: PermissionProfile;
+  walletAddress?: string;
   encryptedPrivateKey: string;
   iv: string;
   salt: string;

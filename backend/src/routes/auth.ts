@@ -3,12 +3,18 @@ import jwt from "jsonwebtoken";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import type { Profile } from "passport-google-oauth20";
+import { generateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
+import { decodeIotaPrivateKey } from "@iota/iota-sdk/cryptography";
 
 import { isOriginAllowed } from "../allowedFrontendOrigins.js";
 import * as db from "../services/db.js";
 import { createDid } from "../services/did.js";
+import { encryptAgentPrivateKey } from "../services/agentCrypto.js";
+import { transferFromMaster } from "../services/masterWallet.js";
 import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
+import type { DbUser } from "../types/db.js";
 
 export type PassportGoogleState = { profile: Profile };
 
@@ -70,6 +76,17 @@ function redirectBaseFromState(req: { query: Record<string, unknown> }, fallback
   return fallback;
 }
 
+/** Risposta API: niente chiave cifrata né mnemonic. */
+function toPublicUser(u: DbUser) {
+  const {
+    encryptedPrivateKey: _enc,
+    iv: _iv,
+    salt: _salt,
+    ...rest
+  } = u;
+  return rest;
+}
+
 export function configureGoogleAuth() {
   const clientID = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -123,9 +140,41 @@ router.get(
       const picture = profile.photos?.[0]?.value ?? "";
 
       let user = await db.findUserByGoogleId(googleId);
+      let firstLoginMnemonic: string | undefined;
+      let firstLoginPrivateKeyHex: string | undefined;
+
       if (!user) {
-        const keypair = Ed25519Keypair.generate();
-        const { did, didDocument, DIDCreationTx } = await createDid(keypair);
+        const mnemonic = generateMnemonic(wordlist, 256);
+        const keypair = Ed25519Keypair.deriveKeypair(mnemonic);
+        const {
+          did,
+          didDocument,
+          DIDCreationTx,
+          walletAddress,
+          privateKeyHex,
+          didGasMode,
+        } = await createDid(keypair, { mnemonic });
+
+        const { secretKey } = decodeIotaPrivateKey(keypair.getSecretKey());
+        const { encryptedPrivateKey, iv, salt } = encryptAgentPrivateKey(googleId, secretKey);
+
+        let airdropTxHash: string | undefined;
+        if (process.env.WELCOME_AIRDROP_ENABLED?.toLowerCase() === "true") {
+          try {
+            const amountIota = Number.parseFloat(process.env.WELCOME_AIRDROP_AMOUNT ?? "0");
+            if (amountIota > 0) {
+              const nanos = BigInt(Math.round(amountIota * 1e9));
+              const digest = await transferFromMaster(walletAddress, nanos);
+              airdropTxHash = digest;
+              console.log(
+                `[auth] Welcome airdrop: sent ${amountIota} IOTA to ${walletAddress} (tx: ${digest})`,
+              );
+            }
+          } catch (airErr) {
+            console.warn("[auth] Welcome airdrop fallito (login continua):", airErr);
+          }
+        }
+
         user = {
           googleId,
           email,
@@ -134,24 +183,41 @@ router.get(
           did,
           didDocument,
           DIDCreationTx,
+          didGasMode,
+          walletAddress,
+          encryptedPrivateKey,
+          iv,
+          salt,
+          ...(airdropTxHash ? { airdropTxHash } : {}),
           createdAt: new Date().toISOString(),
         };
         await db.addUser(user);
+        firstLoginMnemonic = mnemonic;
+        firstLoginPrivateKeyHex = privateKeyHex;
       }
 
-      const token = jwt.sign(
-        {
-          googleId: user.googleId,
-          did: user.did,
-          email: user.email,
-          name: user.name,
-        },
-        getJwtSecret(),
-        { expiresIn: "24h" },
-      );
+      const tokenPayload: Record<string, string | boolean | undefined> = {
+        googleId: user.googleId,
+        did: user.did,
+        email: user.email,
+        name: user.name,
+        walletAddress: user.walletAddress,
+      };
+
+      if (firstLoginMnemonic) {
+        tokenPayload.firstLogin = true;
+        tokenPayload.mnemonic = firstLoginMnemonic;
+        tokenPayload.privateKeyHex = firstLoginPrivateKeyHex;
+      }
+
+      const token = jwt.sign(tokenPayload, getJwtSecret(), { expiresIn: "24h" });
 
       const redirect = new URL(returnBase);
       redirect.searchParams.set("token", token);
+      if (firstLoginMnemonic) {
+        redirect.searchParams.set("firstLogin", "true");
+        redirect.searchParams.set("recovery", firstLoginMnemonic);
+      }
       console.log(
         `[auth] OAuth OK → redirect a ${redirect.origin}${redirect.pathname} (token JWT emesso, googleId=${user.googleId.slice(0, 8)}…)`,
       );
@@ -175,7 +241,7 @@ router.get("/me", requireJwt, async (req, res) => {
       res.status(404).json({ error: "Utente non trovato" });
       return;
     }
-    res.json(user);
+    res.json(toPublicUser(user));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Errore interno";
     res.status(500).json({ error: msg });

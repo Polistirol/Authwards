@@ -8,6 +8,9 @@ export {
 export type {
   Agent,
   AgentLog,
+  AgentStatus,
+  CreateAgentInput,
+  CreateAgentResult,
   IotaAuthConfig,
   User,
 } from "../../sdk";

@@ -6,6 +6,11 @@ export type JwtUserPayload = {
   did: string;
   email: string;
   name: string;
+  walletAddress?: string;
+  /** Solo al primo login (OAuth). */
+  firstLogin?: boolean;
+  mnemonic?: string;
+  privateKeyHex?: string;
 };
 
 declare module "express-serve-static-core" {
@@ -37,6 +42,10 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
       did: decoded.did,
       email: decoded.email,
       name: decoded.name ?? "",
+      walletAddress: decoded.walletAddress,
+      firstLogin: decoded.firstLogin,
+      mnemonic: decoded.mnemonic,
+      privateKeyHex: decoded.privateKeyHex,
     };
     next();
   } catch {

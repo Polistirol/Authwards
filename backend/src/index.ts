@@ -6,10 +6,15 @@ import passport from "passport";
 
 import { getAllowedFrontendOrigins } from "./allowedFrontendOrigins.js";
 import { ensureDbFile } from "./services/db.js";
+import { initMasterWallet, logMasterWalletStatus } from "./services/masterWallet.js";
 import { configureGoogleAuth } from "./routes/auth.js";
 import authRouter from "./routes/auth.js";
 import agentRouter from "./routes/agent.js";
 import didRouter from "./routes/did.js";
+import walletRouter from "./routes/wallet.js";
+import adminRouter from "./routes/admin.js";
+import bridgeRouter from "./routes/bridge.js";
+import { requestLogMiddleware } from "./requestLog.js";
 
 const app = express();
 const PORT = 3000;
@@ -35,18 +40,16 @@ app.use(
 app.use(express.json());
 app.use(passport.initialize());
 
-app.use((req, res, next) => {
-  res.on("finish", () => {
-    console.log(`${req.method} ${req.path} ${res.statusCode}`);
-  });
-  next();
-});
+app.use(requestLogMiddleware);
 
 configureGoogleAuth();
 
 app.use("/auth", authRouter);
 app.use("/agent", agentRouter);
 app.use("/did", didRouter);
+app.use("/wallet", walletRouter);
+app.use("/admin", adminRouter);
+app.use("/bridge", bridgeRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Non trovato" });
@@ -60,6 +63,8 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 async function main() {
   await ensureDbFile();
+  initMasterWallet();
+  await logMasterWalletStatus();
   app.listen(PORT, () => {
     console.log(`Backend in ascolto su http://localhost:${PORT}`);
   });

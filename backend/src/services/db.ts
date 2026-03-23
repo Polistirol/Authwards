@@ -13,8 +13,13 @@ const emptyDb = (): DbShape => ({
 function normalizeDb(parsed: unknown): DbShape {
   if (!parsed || typeof parsed !== "object") return emptyDb();
   const o = parsed as Record<string, unknown>;
+  const usersRaw = Array.isArray(o.users) ? (o.users as DbUser[]) : [];
+  const users = usersRaw.map((u) => ({
+    ...u,
+    nextAgentIndex: u.nextAgentIndex ?? 0,
+  }));
   return {
-    users: Array.isArray(o.users) ? (o.users as DbUser[]) : [],
+    users,
     agents: Array.isArray(o.agents) ? (o.agents as DbAgent[]) : [],
     agentLogs: Array.isArray(o.agentLogs) ? (o.agentLogs as DbAgentLog[]) : [],
     shipments: Array.isArray(o.shipments) ? (o.shipments as DbShipment[]) : [],
@@ -102,4 +107,41 @@ export async function getAgentLogs(agentDid: string, limit = 50): Promise<DbAgen
 export async function findAgentByDid(agentDid: string): Promise<DbAgent | undefined> {
   const db = await readDb();
   return db.agents.find((a) => a.agentDid === agentDid);
+}
+
+export async function findAgentByToken(agentToken: string): Promise<DbAgent | undefined> {
+  const db = await readDb();
+  return db.agents.find((a) => a.agentToken === agentToken);
+}
+
+export async function updateUserByGoogleId(googleId: string, patch: Partial<DbUser>): Promise<boolean> {
+  const db = await readDb();
+  const i = db.users.findIndex((u) => u.googleId === googleId);
+  if (i < 0) return false;
+  db.users[i] = { ...db.users[i], ...patch };
+  await writeDb(db);
+  return true;
+}
+
+export async function updateAgentByDid(agentDid: string, patch: Partial<DbAgent>): Promise<boolean> {
+  const db = await readDb();
+  const i = db.agents.findIndex((a) => a.agentDid === agentDid);
+  if (i < 0) return false;
+  db.agents[i] = { ...db.agents[i], ...patch };
+  await writeDb(db);
+  return true;
+}
+
+export async function findShipmentById(id: string): Promise<DbShipment | undefined> {
+  const db = await readDb();
+  return db.shipments.find((s) => s.id === id);
+}
+
+export async function updateShipmentById(id: string, patch: Partial<DbShipment>): Promise<boolean> {
+  const db = await readDb();
+  const i = db.shipments.findIndex((s) => s.id === id);
+  if (i < 0) return false;
+  db.shipments[i] = { ...db.shipments[i], ...patch };
+  await writeDb(db);
+  return true;
 }

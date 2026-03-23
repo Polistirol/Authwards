@@ -1,0 +1,60 @@
+import http from "node:http";
+
+import type { NextFunction, Request, Response } from "express";
+
+function statusLine(code: number): string {
+  const name = http.STATUS_CODES[code];
+  return name ? `${code} ${name}` : `${code}`;
+}
+
+function isVerboseHttpEnabled(): boolean {
+  const v = process.env.LOG_HTTP_VERBOSE?.trim().toLowerCase();
+  return v === "true" || v === "1" || v === "yes";
+}
+
+/** Path senza query (per confronti stabili). */
+function pathOnly(req: Request): string {
+  const u = req.originalUrl ?? req.url ?? "/";
+  const q = u.indexOf("?");
+  return q >= 0 ? u.slice(0, q) : u;
+}
+
+/**
+ * Logga richieste HTTP:
+ * - Sempre: POST/PUT/PATCH/DELETE, risposte ≥400, GET OAuth `/auth/google*`
+ * - Solo se `LOG_HTTP_VERBOSE=true`: altri GET/HEAD
+ */
+export function requestLogMiddleware(req: Request, res: Response, next: NextFunction): void {
+  res.on("finish", () => {
+    const method = req.method.toUpperCase();
+    const code = res.statusCode;
+    const path = pathOnly(req);
+    const line = `${method} ${path} ${statusLine(code)}`;
+
+    if (code >= 400) {
+      console.log(line);
+      return;
+    }
+
+    if (method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") {
+      console.log(line);
+      return;
+    }
+
+    if (method === "GET" || method === "HEAD") {
+      if (path.startsWith("/auth/google")) {
+        console.log(line);
+        return;
+      }
+      if (isVerboseHttpEnabled()) {
+        console.log(line);
+      }
+      return;
+    }
+
+    if (isVerboseHttpEnabled()) {
+      console.log(line);
+    }
+  });
+  next();
+}

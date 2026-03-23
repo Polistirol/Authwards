@@ -1,0 +1,77 @@
+{
+  "users": [
+    {
+      "googleId": "112041774877821909743",
+      "email": "lorrenzo.aloi@gmail.com",
+      "name": "Lorenzo Aloi",
+      "picture": "https://lh3.googleusercontent.com/a/ACg8ocLsqyXz2xaZqnc5AakrO6F0Vwdb3QebmM5s1LvxkNQgdNI1dg=s96-c",
+      "did": "did:iota:testnet:0x8e50e56d03f0c28d92042de1828394f203774eb27960c259ec4e1cafb6006b9c",
+      "didDocument": {
+        "doc": {
+          "id": "did:iota:testnet:0x8e50e56d03f0c28d92042de1828394f203774eb27960c259ec4e1cafb6006b9c",
+          "verificationMethod": [
+            {
+              "id": "did:iota:testnet:0x8e50e56d03f0c28d92042de1828394f203774eb27960c259ec4e1cafb6006b9c#key-1",
+              "controller": "did:iota:testnet:0x8e50e56d03f0c28d92042de1828394f203774eb27960c259ec4e1cafb6006b9c",
+              "type": "JsonWebKey2020",
+              "publicKeyJwk": {
+                "kty": "OKP",
+                "alg": "EdDSA",
+                "kid": "ZpWlF-MirMv_yng9qq8L8Re5vn4",
+                "crv": "Ed25519",
+                "x": "o13YIm4LhEUJArI8QBna-M7_e0Eu2Vehw_Q_3fWe2dw"
+              }
+            }
+          ]
+        },
+        "meta": {
+          "created": "2026-03-19T23:50:25Z",
+          "updated": "2026-03-19T23:50:25Z"
+        }
+      },
+      "DIDCreationTx": "4zR7ojsFB79xhMoUmAGP8hB6AowPyUQMa1mRSEEm67eK",
+      "createdAt": "2026-03-19T23:50:27.876Z"
+    }
+  ],
+  "agents": [
+    {
+      "agentDid": "did:iota:testnet:0xf2a1e1a7280d9ab8c025183c34d837c2c9ab2f10acabbb40dbbbb19167d78e9e",
+      "ownerDid": "did:iota:testnet:0x8e50e56d03f0c28d92042de1828394f203774eb27960c259ec4e1cafb6006b9c",
+      "ownerGoogleId": "112041774877821909743",
+      "permissionProfile": "low_value",
+      "encryptedPrivateKey": "2xg8wnIR2CGZe9sTJzEhaRoqVnXK1TyAjsDGTTvkOo1bZsD0KawMFNK3U3Y3YF+S",
+      "iv": "PGaUuqdc2CuOEJFe",
+      "salt": "wjME3Uoom62I8wRNwVXMVA==",
+      "createdAt": "2026-03-20T00:19:07.069Z",
+      "active": true,
+      "taskType": "shipment_monitor",
+      "taskConfig": {
+        "shipmentId": "SHIP-001",
+        "action": "release_payment"
+      }
+    }
+  ],
+  "agentLogs": [],
+  "shipments": [
+    {
+      "id": "SHIP-001",
+      "product": "Caffè Arabica - Lotto #4821",
+      "origin": "Bogotá, Colombia",
+      "destination": "Genova, Italia",
+      "status": "in_transit",
+      "supplier": "did:iota:supplier_placeholder",
+      "paymentAmount": 50,
+      "createdAt": "2026-03-20T10:00:00Z"
+    },
+    {
+      "id": "SHIP-002",
+      "product": "Olio EVO - Lotto #1190",
+      "origin": "Kalamata, Grecia",
+      "destination": "Rotterdam, Paesi Bassi",
+      "status": "in_transit",
+      "supplier": "did:iota:supplier_placeholder",
+      "paymentAmount": 30,
+      "createdAt": "2026-03-20T11:00:00Z"
+    }
+  ]
+}

@@ -156,7 +156,8 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
   const base = useMemo(() => trimTrailingSlash(backendUrl), [backendUrl]);
 
   const { user, isAuthenticated, loading, login, logout } = useIotaAuth();
-  const { agents, loading: agentsLoading, createAgent, agentLogs, connectLogs } = useAgent();
+  const { agents, loading: agentsLoading, createAgent, agentLogs, fetchAgentLogs } =
+    useAgent();
 
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -221,16 +222,18 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
 
   useEffect(() => {
     if (!isAuthenticated || agents.length === 0) return;
-    try {
-      for (const a of agents) {
-        connectLogs(a.agentDid);
+    (async () => {
+      try {
+        for (const a of agents) {
+          await fetchAgentLogs(a.agentDid);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        pushLog("error", `fetchAgentLogs error: ${msg}`);
+        console.error(e);
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      pushLog("error", `connectLogs error: ${msg}`);
-      console.error(e);
-    }
-  }, [isAuthenticated, agents, connectLogs, pushLog]);
+    })();
+  }, [isAuthenticated, agents, fetchAgentLogs, pushLog]);
 
   const toggle = (key: string) => {
     setSections((s) => ({ ...s, [key]: !s[key] }));
@@ -260,8 +263,12 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
 
   const handleCreate = async (profile: string) => {
     try {
-      pushLog("info", `createAgent('${profile}') …`);
-      await createAgent(profile);
+      pushLog("info", `createAgent({ permissionProfile: '${profile}', … }) …`);
+      await createAgent({
+        permissionProfile: profile,
+        name: `Dev agent ${new Date().toISOString().slice(0, 19)}`,
+        description: "Creato da test-sdk-app DevPanel",
+      });
       pushLog("success", `createAgent('${profile}') completed`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
