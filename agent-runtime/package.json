@@ -1,0 +1,25 @@
+{
+  "name": "iotauth-agent-runtime",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx src/index.ts",
+    "dev": "node --import tsx --watch src/index.ts"
+  },
+  "dependencies": {
+    "@iota/iota-sdk": "^1.11.0",
+    "@iota/identity-wasm": "beta",
+    "@iota/sdk": "^1.1.6",
+    "dotenv": "^16.4.7",
+    "fs-extra": "^11.2.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

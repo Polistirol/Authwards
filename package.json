@@ -1,0 +1,20 @@
+{
+  "name": "iotauth-identity-spike",
+  "version": "0.0.1",
+  "private": true,
+  "description": "End-to-end spike: OAuth simulation, encrypted Ed25519 key, IOTA Identity DID, transfers on testnet",
+  "scripts": {
+    "spike": "tsx spike.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iota/identity-wasm": "beta",
+    "@iota/iota-sdk": "^1.11.0",
+    "@iota/sdk": "^1.1.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
