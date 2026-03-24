@@ -1,10 +1,13 @@
-export type PermissionProfile = "readonly" | "low_value" | "full_access";
+export type PermissionProfile = "readonly" | "custom" | "full_access" | "low_value";
+
+export type AuthProviderType = "google" | "github" | "wallet" | "telegram";
 
 export type DbUser = {
-  googleId: string;
-  email: string;
+  providerId: string;
+  providerType: AuthProviderType;
+  email: string | null;
   name: string;
-  picture: string;
+  picture: string | null;
   did: string;
   didDocument: Record<string, unknown>;
   DIDCreationTx?: string;
@@ -25,7 +28,8 @@ export type AgentTaskConfig = {
 export type DbAgent = {
   agentDid: string;
   ownerDid: string;
-  ownerGoogleId: string;
+  ownerProviderId: string;
+  ownerProviderType: AuthProviderType;
   permissionProfile: PermissionProfile;
   walletAddress?: string;
   encryptedPrivateKey: string;

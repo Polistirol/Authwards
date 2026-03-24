@@ -64,7 +64,7 @@ router.post("/transfer", requireJwt, async (req, res) => {
     }
     const amountNanos = BigInt(Math.floor(amountNum));
 
-    const user = await db.findUserByGoogleId(jwtUser.googleId);
+    const user = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
     if (!user?.encryptedPrivateKey || !user.iv || !user.salt) {
       res.status(400).json({ error: "Wallet utente non disponibile (login precedente o dati mancanti)" });
       return;

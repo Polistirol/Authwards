@@ -7,6 +7,11 @@ import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
 import * as db from "../services/db.js";
 import { getPermissionLimits, utcDateString } from "../services/agentPermissions.js";
 import { deriveAgentKeypair } from "../services/keyDerivation.js";
+import {
+  authorizeSpendOnChain,
+  getPermitInfo,
+  revokePermitOnChain,
+} from "../services/permitContract.js";
 import type { AgentStatus, DbAgent } from "../types/db.js";
 
 const router = Router();
@@ -23,10 +28,14 @@ function getNodeUrl(): string {
 }
 
 function effectiveStatus(a: DbAgent): AgentStatus {
+  if (a.status === "pending_activation") return "created";
+  if (a.status === "created" || a.status === "active" || a.status === "revoked") {
+    return a.status;
+  }
   if (a.status) return a.status;
   if (a.active === false) return "revoked";
   if (a.active === true) return "active";
-  return "pending_activation";
+  return "created";
 }
 
 function requireBridgeAgent(a: DbAgent | undefined): a is DbAgent & {
@@ -50,21 +59,9 @@ router.post("/activate", requireAgentToken, async (req, res) => {
       res.json({ status: "already_active", agentDid: a.agentDid });
       return;
     }
-    if (a.permitObjectId) {
-      console.log("[bridge] Agent activated with on-chain permit:", a.permitObjectId);
-    }
-    await db.updateAgentByDid(a.agentDid, {
-      status: "active",
-      activatedAt: new Date().toISOString(),
-    });
-    res.json({
-      status: "active",
-      agentDid: a.agentDid,
-      permissions: {
-        permissionProfile: a.permissionProfile,
-        taskType: a.taskType,
-      },
-      message: "Agent successfully activated",
+    res.status(403).json({
+      error: "activate_from_dashboard",
+      message: "Please activate this agent from the dashboard first",
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Errore activate";
@@ -79,7 +76,10 @@ router.post("/check", requireAgentToken, async (req, res) => {
     if (st !== "active") {
       res.status(403).json({
         error: "agent_not_activated",
-        message: st === "revoked" ? "Agent revoked" : "Complete onboarding first",
+        message:
+          st === "revoked"
+            ? "Agent revoked"
+            : "Agent must be activated from the dashboard",
       });
       return;
     }
@@ -118,7 +118,10 @@ router.post("/execute", requireAgentToken, async (req, res) => {
     if (st !== "active") {
       res.status(403).json({
         error: "agent_not_activated",
-        message: "Agent must be active",
+        message:
+          st === "revoked"
+            ? "Agent must be active"
+            : "Agent must be activated from the dashboard",
       });
       return;
     }
@@ -133,17 +136,10 @@ router.post("/execute", requireAgentToken, async (req, res) => {
       return;
     }
 
-    const owner = await db.findUserByGoogleId(a.ownerGoogleId);
+    const owner = await db.findUserByProvider(a.ownerProviderId, a.ownerProviderType);
     if (!owner?.walletAddress) {
       res.status(400).json({ error: "owner_wallet_missing" });
       return;
-    }
-
-    const limits = getPermissionLimits(a.permissionProfile);
-    const today = utcDateString();
-    let spentToday = BigInt(a.spentTodayNanos ?? "0");
-    if (a.spentTodayDate !== today) {
-      spentToday = 0n;
     }
 
     const taskAmount =
@@ -152,16 +148,53 @@ router.post("/execute", requireAgentToken, async (req, res) => {
         : 50_000_000n;
     const amountNanos = taskAmount;
 
-    if (amountNanos > limits.maxPerTx) {
-      res.status(403).json({ error: "tx_limit", maxPerTx: limits.maxPerTx.toString() });
-      return;
+    const limits = getPermissionLimits(a);
+    const today = utcDateString();
+    let spentToday = BigInt(a.spentTodayNanos ?? "0");
+    if (a.spentTodayDate !== today) {
+      spentToday = 0n;
     }
-    if (spentToday + amountNanos > limits.maxPerDay) {
-      res.status(403).json({
-        error: "daily_limit",
-        remainingDailyBudget: (limits.maxPerDay - spentToday).toString(),
-      });
-      return;
+
+    let usedOnChainPermit = false;
+    if (a.permitObjectId) {
+      const auth = await authorizeSpendOnChain(a.permitObjectId, amountNanos);
+      if (auth.success) {
+        usedOnChainPermit = true;
+      } else if (auth.networkError || auth.error === "permit_package_missing") {
+        console.warn(
+          "[bridge/execute] On-chain permit non verificabile (rete o package non configurato), uso fallback db.json",
+        );
+      } else {
+        const err = auth.error;
+        const msg =
+          err === "permit_expired"
+            ? "Permit scaduto"
+            : err === "permit_inactive"
+              ? "Permit revocato o inattivo"
+              : err === "tx_limit"
+                ? "Limite per transazione superato (on-chain)"
+                : err === "daily_limit"
+                  ? "Limite giornaliero superato (on-chain)"
+                  : err;
+        res.status(403).json({ error: err, message: msg });
+        return;
+      }
+    } else {
+      console.log("[bridge/execute] No on-chain permit, using db.json fallback");
+    }
+
+    if (!usedOnChainPermit) {
+      if (amountNanos > limits.maxPerTx) {
+        res.status(403).json({ error: "tx_limit", maxPerTx: limits.maxPerTx.toString() });
+        return;
+      }
+      if (spentToday + amountNanos > limits.maxPerDay) {
+        res.status(403).json({
+          error: "daily_limit",
+          remainingDailyBudget: (limits.maxPerDay - spentToday).toString(),
+        });
+        return;
+      }
     }
 
     const recipient =
@@ -169,7 +202,7 @@ router.post("/execute", requireAgentToken, async (req, res) => {
         ? a.taskConfig.recipientAddress.trim()
         : owner.walletAddress;
 
-    const { keypair } = deriveAgentKeypair(a.ownerGoogleId, owner.walletAddress, a.agentIndex);
+    const { keypair } = deriveAgentKeypair(a.ownerProviderId, owner.walletAddress, a.agentIndex);
 
     const client = new IotaClient({ url: getNodeUrl() });
     const tx = new Transaction();
@@ -182,11 +215,26 @@ router.post("/execute", requireAgentToken, async (req, res) => {
       options: TX_OPTS,
     });
 
-    const newSpent = spentToday + amountNanos;
-    await db.updateAgentByDid(a.agentDid, {
-      spentTodayNanos: newSpent.toString(),
-      spentTodayDate: today,
-    });
+    if (!usedOnChainPermit) {
+      const newSpent = spentToday + amountNanos;
+      await db.updateAgentByDid(a.agentDid, {
+        spentTodayNanos: newSpent.toString(),
+        spentTodayDate: today,
+      });
+    }
+
+    let remainingDailyBudget: number;
+    if (usedOnChainPermit && a.permitObjectId) {
+      const info = await getPermitInfo(a.permitObjectId);
+      if (info) {
+        const rem = BigInt(info.maxPerDay) - BigInt(info.spentToday);
+        remainingDailyBudget = Number(rem > 0n ? rem : 0n);
+      } else {
+        remainingDailyBudget = 0;
+      }
+    } else {
+      remainingDailyBudget = Number(limits.maxPerDay - spentToday - amountNanos);
+    }
 
     if (a.taskType === "shipment_monitor" && a.taskConfig?.shipmentId && action === "release_payment") {
       await db.updateShipmentById(a.taskConfig.shipmentId, { status: "payment_released" });
@@ -208,7 +256,7 @@ router.post("/execute", requireAgentToken, async (req, res) => {
       success: true,
       txHash: result.digest,
       amount: Number(amountNanos),
-      remainingDailyBudget: Number(limits.maxPerDay - newSpent),
+      remainingDailyBudget,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Errore execute";
@@ -220,7 +268,7 @@ router.get("/status", requireAgentToken, async (req, res) => {
   try {
     const a = req.agent!;
     const st = effectiveStatus(a);
-    const limits = getPermissionLimits(a.permissionProfile);
+    const limits = getPermissionLimits(a);
     const today = utcDateString();
     let spentToday = BigInt(a.spentTodayNanos ?? "0");
     if (a.spentTodayDate !== today) {
@@ -234,6 +282,57 @@ router.get("/status", requireAgentToken, async (req, res) => {
       balance = totalBalance;
     }
 
+    let permissions: {
+      maxPerTx: string;
+      maxPerDay: string;
+      spentToday: string;
+      expiresAt: string | null;
+      isActive?: boolean;
+      createdAt?: string;
+    };
+
+    if (a.permitObjectId) {
+      try {
+        const onChain = await getPermitInfo(a.permitObjectId);
+        if (onChain) {
+          permissions = {
+            maxPerTx: onChain.maxPerTx,
+            maxPerDay: onChain.maxPerDay,
+            spentToday: onChain.spentToday,
+            expiresAt: onChain.expiresAt === "0" ? null : onChain.expiresAt,
+            isActive: onChain.isActive,
+            createdAt: onChain.createdAt,
+          };
+        } else {
+          console.warn("[bridge/status] getPermitInfo vuoto, fallback db.json");
+          permissions = {
+            maxPerTx: limits.maxPerTx.toString(),
+            maxPerDay: limits.maxPerDay.toString(),
+            spentToday: spentToday.toString(),
+            expiresAt:
+              a.permitExpiresAtMs && a.permitExpiresAtMs !== "0" ? a.permitExpiresAtMs : null,
+          };
+        }
+      } catch (e) {
+        console.warn("[bridge/status] Lettura permit on-chain fallita, fallback db.json:", e);
+        permissions = {
+          maxPerTx: limits.maxPerTx.toString(),
+          maxPerDay: limits.maxPerDay.toString(),
+          spentToday: spentToday.toString(),
+          expiresAt:
+            a.permitExpiresAtMs && a.permitExpiresAtMs !== "0" ? a.permitExpiresAtMs : null,
+        };
+      }
+    } else {
+      permissions = {
+        maxPerTx: limits.maxPerTx.toString(),
+        maxPerDay: limits.maxPerDay.toString(),
+        spentToday: spentToday.toString(),
+        expiresAt:
+          a.permitExpiresAtMs && a.permitExpiresAtMs !== "0" ? a.permitExpiresAtMs : null,
+      };
+    }
+
     res.json({
       agentDid: a.agentDid,
       status: st,
@@ -245,12 +344,7 @@ router.get("/status", requireAgentToken, async (req, res) => {
       createdAt: a.createdAt,
       taskType: a.taskType,
       taskConfig: a.taskConfig,
-      permissions: {
-        maxPerTx: limits.maxPerTx.toString(),
-        maxPerDay: limits.maxPerDay.toString(),
-        spentToday: spentToday.toString(),
-        expiresAt: null as string | null,
-      },
+      permissions,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Errore status";
@@ -267,14 +361,23 @@ router.post("/revoke", requireJwt, async (req, res) => {
       return;
     }
     const a = await db.findAgentByDid(agentDid.trim());
-    if (!a || a.ownerGoogleId !== jwtUser.googleId) {
+    if (
+      !a ||
+      a.ownerProviderId !== jwtUser.providerId ||
+      a.ownerProviderType !== jwtUser.providerType
+    ) {
       res.status(403).json({ error: "Agente non trovato o non autorizzato" });
       return;
     }
-    if (a.permitObjectId) {
-      console.log("[bridge] revoke: AgentPermit on-chain non revocato (contratto non deployato):", a.permitObjectId);
-    }
     await db.updateAgentByDid(a.agentDid, { status: "revoked", active: false });
+    if (a.permitObjectId) {
+      const rev = await revokePermitOnChain(a.permitObjectId);
+      if (rev.success && rev.txHash) {
+        console.log(`[bridge/revoke] AgentPermit revocato on-chain: ${rev.txHash}`);
+      } else {
+        console.warn("[bridge/revoke] revoke_permit on-chain fallita:", rev.error ?? "unknown");
+      }
+    }
     res.json({ status: "revoked" });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Errore revoke";

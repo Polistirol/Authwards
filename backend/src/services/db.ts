@@ -1,6 +1,6 @@
 import fs from "fs-extra";
 
-import type { DbAgent, DbAgentLog, DbShape, DbShipment, DbUser } from "../types/db.js";
+import type { AuthProviderType, DbAgent, DbAgentLog, DbShape, DbShipment, DbUser } from "../types/db.js";
 import { DB_PATH } from "../paths.js";
 
 const emptyDb = (): DbShape => ({
@@ -10,19 +10,103 @@ const emptyDb = (): DbShape => ({
   shipments: [],
 });
 
-function normalizeDb(parsed: unknown): DbShape {
-  if (!parsed || typeof parsed !== "object") return emptyDb();
-  const o = parsed as Record<string, unknown>;
-  const usersRaw = Array.isArray(o.users) ? (o.users as DbUser[]) : [];
-  const users = usersRaw.map((u) => ({
-    ...u,
-    nextAgentIndex: u.nextAgentIndex ?? 0,
-  }));
+function isAuthProviderType(v: unknown): v is AuthProviderType {
+  return v === "google" || v === "github" || v === "wallet" || v === "telegram";
+}
+
+function migrateUserRecord(raw: unknown): { user: DbUser; migrated: boolean } {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Record utente non valido");
+  }
+  const o = { ...(raw as Record<string, unknown>) };
+  let migrated = false;
+  if (typeof o.googleId === "string" && o.googleId && typeof o.providerId !== "string") {
+    o.providerId = o.googleId;
+    o.providerType = "google";
+    delete o.googleId;
+    migrated = true;
+  }
+  if (typeof o.providerId !== "string" || !o.providerId) {
+    throw new Error("Record utente senza providerId");
+  }
+  if (!isAuthProviderType(o.providerType)) {
+    o.providerType = "google";
+    migrated = true;
+  }
+  delete o.googleId;
+  const email =
+    o.email === undefined || o.email === null ? null : String(o.email);
+  const picture =
+    o.picture === undefined || o.picture === null ? null : String(o.picture);
+  const name = o.name === undefined || o.name === null ? "" : String(o.name);
   return {
-    users,
-    agents: Array.isArray(o.agents) ? (o.agents as DbAgent[]) : [],
-    agentLogs: Array.isArray(o.agentLogs) ? (o.agentLogs as DbAgentLog[]) : [],
-    shipments: Array.isArray(o.shipments) ? (o.shipments as DbShipment[]) : [],
+    user: {
+      ...(o as unknown as DbUser),
+      email,
+      picture,
+      name,
+      providerId: o.providerId as string,
+      providerType: o.providerType as AuthProviderType,
+      nextAgentIndex: (o.nextAgentIndex as number | undefined) ?? 0,
+    },
+    migrated,
+  };
+}
+
+function migrateAgentRecord(raw: unknown): { agent: DbAgent; migrated: boolean } {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Record agente non valido");
+  }
+  const o = { ...(raw as Record<string, unknown>) };
+  let migrated = false;
+  if (typeof o.ownerGoogleId === "string" && o.ownerGoogleId && typeof o.ownerProviderId !== "string") {
+    o.ownerProviderId = o.ownerGoogleId;
+    o.ownerProviderType = "google";
+    delete o.ownerGoogleId;
+    migrated = true;
+  }
+  if (typeof o.ownerProviderId !== "string" || !o.ownerProviderId) {
+    throw new Error("Record agente senza ownerProviderId");
+  }
+  if (!isAuthProviderType(o.ownerProviderType)) {
+    o.ownerProviderType = "google";
+    migrated = true;
+  }
+  delete o.ownerGoogleId;
+  return {
+    agent: { ...(o as unknown as DbAgent) } as DbAgent,
+    migrated,
+  };
+}
+
+export function normalizeDb(parsed: unknown): { shape: DbShape; migrated: boolean } {
+  if (!parsed || typeof parsed !== "object") {
+    return { shape: emptyDb(), migrated: false };
+  }
+  const o = parsed as Record<string, unknown>;
+  const usersRaw = Array.isArray(o.users) ? o.users : [];
+  const agentsRaw = Array.isArray(o.agents) ? o.agents : [];
+  let migrated = false;
+  const users: DbUser[] = [];
+  for (const u of usersRaw) {
+    const r = migrateUserRecord(u);
+    if (r.migrated) migrated = true;
+    users.push(r.user);
+  }
+  const agents: DbAgent[] = [];
+  for (const a of agentsRaw) {
+    const r = migrateAgentRecord(a);
+    if (r.migrated) migrated = true;
+    agents.push(r.agent);
+  }
+  return {
+    shape: {
+      users,
+      agents,
+      agentLogs: Array.isArray(o.agentLogs) ? (o.agentLogs as DbAgentLog[]) : [],
+      shipments: Array.isArray(o.shipments) ? (o.shipments as DbShipment[]) : [],
+    },
+    migrated,
   };
 }
 
@@ -47,7 +131,8 @@ export async function ensureDbFile(): Promise<void> {
     const raw = await fs.readFile(DB_PATH, "utf8");
     const parsed = JSON.parse(raw) as unknown;
     if (needsDbRepair(parsed)) {
-      await writeDb(normalizeDb(parsed));
+      const { shape } = normalizeDb(parsed);
+      await writeDb(shape);
     }
   } catch {
     await fs.writeJson(DB_PATH, emptyDb(), { spaces: 2 });
@@ -57,16 +142,28 @@ export async function ensureDbFile(): Promise<void> {
 export async function readDb(): Promise<DbShape> {
   const raw = await fs.readFile(DB_PATH, "utf8");
   const parsed = JSON.parse(raw) as unknown;
-  return normalizeDb(parsed);
+  const { shape, migrated } = normalizeDb(parsed);
+  if (migrated) {
+    await writeDb(shape);
+  }
+  return shape;
 }
 
 export async function writeDb(data: DbShape): Promise<void> {
   await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), "utf8");
 }
 
-export async function findUserByGoogleId(googleId: string): Promise<DbUser | undefined> {
+export async function findUserByProvider(
+  providerId: string,
+  providerType: AuthProviderType,
+): Promise<DbUser | undefined> {
   const db = await readDb();
-  return db.users.find((u) => u.googleId === googleId);
+  return db.users.find((u) => u.providerId === providerId && u.providerType === providerType);
+}
+
+/** @deprecated Usare findUserByProvider; solo compat lettura codice legacy. */
+export async function findUserByGoogleId(googleId: string): Promise<DbUser | undefined> {
+  return findUserByProvider(googleId, "google");
 }
 
 export async function findUserByDid(did: string): Promise<DbUser | undefined> {
@@ -80,9 +177,14 @@ export async function addUser(user: DbUser): Promise<void> {
   await writeDb(db);
 }
 
-export async function findAgentsByOwner(googleId: string): Promise<DbAgent[]> {
+export async function findAgentsByOwner(
+  ownerProviderId: string,
+  ownerProviderType: AuthProviderType,
+): Promise<DbAgent[]> {
   const db = await readDb();
-  return db.agents.filter((a) => a.ownerGoogleId === googleId);
+  return db.agents.filter(
+    (a) => a.ownerProviderId === ownerProviderId && a.ownerProviderType === ownerProviderType,
+  );
 }
 
 export async function addAgent(agent: DbAgent): Promise<void> {
@@ -114,13 +216,22 @@ export async function findAgentByToken(agentToken: string): Promise<DbAgent | un
   return db.agents.find((a) => a.agentToken === agentToken);
 }
 
-export async function updateUserByGoogleId(googleId: string, patch: Partial<DbUser>): Promise<boolean> {
+export async function updateUserByProvider(
+  providerId: string,
+  providerType: AuthProviderType,
+  patch: Partial<DbUser>,
+): Promise<boolean> {
   const db = await readDb();
-  const i = db.users.findIndex((u) => u.googleId === googleId);
+  const i = db.users.findIndex((u) => u.providerId === providerId && u.providerType === providerType);
   if (i < 0) return false;
   db.users[i] = { ...db.users[i], ...patch };
   await writeDb(db);
   return true;
+}
+
+/** @deprecated Usare updateUserByProvider. */
+export async function updateUserByGoogleId(googleId: string, patch: Partial<DbUser>): Promise<boolean> {
+  return updateUserByProvider(googleId, "google", patch);
 }
 
 export async function updateAgentByDid(agentDid: string, patch: Partial<DbAgent>): Promise<boolean> {

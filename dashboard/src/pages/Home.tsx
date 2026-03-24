@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { LoginModal, useIotaAuth } from "../sdk";
+import { useIotaAuth } from "../sdk";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isAuthenticated, loading } = useIotaAuth();
-  const [modalOpen, setModalOpen] = useState(false);
+  const { isAuthenticated, loading, login } = useIotaAuth();
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -41,10 +40,10 @@ export default function Home() {
           </p>
           <button
             type="button"
-            onClick={() => setModalOpen(true)}
+            onClick={() => login()}
             className="mt-10 rounded-xl bg-[#6ee7b7] px-8 py-3.5 text-base font-semibold text-[#0a0b0f] shadow-[0_0_32px_rgba(110,231,183,0.25)] transition hover:bg-[#5dd9a8]"
           >
-            Inizia con Google
+            Accedi
           </button>
         </section>
 
@@ -81,8 +80,6 @@ export default function Home() {
           </article>
         </section>
       </main>
-
-      <LoginModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
   );
 }

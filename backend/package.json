@@ -8,16 +8,17 @@
     "dev": "node --import tsx --watch src/index.ts"
   },
   "dependencies": {
-    "@scure/bip39": "^1.6.0",
     "@iota/identity-wasm": "beta",
     "@iota/iota-interaction-ts": "^0.11.0",
     "@iota/iota-sdk": "^1.11.0",
+    "@scure/bip39": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "fs-extra": "^11.2.0",
     "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
@@ -27,6 +28,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.0",
     "@types/passport": "^1.0.17",
+    "@types/passport-github2": "^1.2.9",
     "@types/passport-google-oauth20": "^2.0.16",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

@@ -1,6 +1,9 @@
 export { IotaAuthProvider } from "./src/IotaAuthProvider";
 export type { IotaAuthProviderProps } from "./src/IotaAuthProvider";
 
+export { IotaAuthContext } from "./src/IotaAuthContext";
+export type { IotaAuthContextValue } from "./src/IotaAuthContext";
+
 export { useIotaAuth } from "./src/useIotaAuth";
 export type { UseIotaAuthResult } from "./src/useIotaAuth";
 
@@ -13,4 +16,15 @@ export type { CreateAgentInput, CreateAgentResult, UseAgentResult } from "./src/
 export { LoginModal } from "./src/LoginModal";
 export type { LoginModalProps } from "./src/LoginModal";
 
-export type { IotaAuthConfig, User, Agent, AgentLog, AgentStatus } from "./src/types";
+export { ConnectButton } from "./src/ConnectButton";
+export type { ConnectButtonProps } from "./src/ConnectButton";
+
+export type {
+  AuthProviderType,
+  IotaAuthConfig,
+  User,
+  Agent,
+  AgentLog,
+  AgentStatus,
+  AgentTaskConfig,
+} from "./src/types";

@@ -2,7 +2,9 @@ import { Router } from "express";
 import jwt from "jsonwebtoken";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import type { Profile } from "passport-google-oauth20";
+import type { Profile as GoogleProfile } from "passport-google-oauth20";
+import { Strategy as GitHubStrategy } from "passport-github2";
+import type { Profile as GithubProfile } from "passport-github2";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { decodeIotaPrivateKey } from "@iota/iota-sdk/cryptography";
@@ -14,11 +16,16 @@ import { encryptAgentPrivateKey } from "../services/agentCrypto.js";
 import { transferFromMaster } from "../services/masterWallet.js";
 import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
-import type { DbUser } from "../types/db.js";
+import type { AuthProviderType, DbUser } from "../types/db.js";
+import authWalletTelegramRouter from "./authWalletTelegram.js";
 
-export type PassportGoogleState = { profile: Profile };
+export type PassportGoogleState = { profile: GoogleProfile };
 
 const router = Router();
+
+router.use(authWalletTelegramRouter);
+
+let githubStrategyRegistered = false;
 
 function getJwtSecret(): string {
   const s = process.env.JWT_SECRET;
@@ -87,7 +94,107 @@ function toPublicUser(u: DbUser) {
   return rest;
 }
 
-export function configureGoogleAuth() {
+async function completeOAuthLogin(
+  res: import("express").Response,
+  returnBase: string,
+  fields: {
+    providerType: AuthProviderType;
+    providerId: string;
+    email: string | null;
+    name: string;
+    picture: string | null;
+  },
+): Promise<void> {
+  const { providerType, providerId, email, name, picture } = fields;
+
+  let user = await db.findUserByProvider(providerId, providerType);
+  let firstLoginMnemonic: string | undefined;
+  let firstLoginPrivateKeyHex: string | undefined;
+
+  if (!user) {
+    const mnemonic = generateMnemonic(wordlist, 256);
+    const keypair = Ed25519Keypair.deriveKeypair(mnemonic);
+    const {
+      did,
+      didDocument,
+      DIDCreationTx,
+      walletAddress,
+      privateKeyHex,
+      didGasMode,
+    } = await createDid(keypair, { mnemonic });
+
+    const { secretKey } = decodeIotaPrivateKey(keypair.getSecretKey());
+    const { encryptedPrivateKey, iv, salt } = encryptAgentPrivateKey(providerId, secretKey);
+
+    let airdropTxHash: string | undefined;
+    if (process.env.WELCOME_AIRDROP_ENABLED?.toLowerCase() === "true") {
+      try {
+        const amountIota = Number.parseFloat(process.env.WELCOME_AIRDROP_AMOUNT ?? "0");
+        if (amountIota > 0) {
+          const nanos = BigInt(Math.round(amountIota * 1e9));
+          const digest = await transferFromMaster(walletAddress, nanos);
+          airdropTxHash = digest;
+          console.log(
+            `[auth] Welcome airdrop: sent ${amountIota} IOTA to ${walletAddress} (tx: ${digest})`,
+          );
+        }
+      } catch (airErr) {
+        console.warn("[auth] Welcome airdrop fallito (login continua):", airErr);
+      }
+    }
+
+    user = {
+      providerId,
+      providerType,
+      email,
+      name,
+      picture,
+      did,
+      didDocument,
+      DIDCreationTx,
+      didGasMode,
+      walletAddress,
+      encryptedPrivateKey,
+      iv,
+      salt,
+      ...(airdropTxHash ? { airdropTxHash } : {}),
+      createdAt: new Date().toISOString(),
+    };
+    await db.addUser(user);
+    firstLoginMnemonic = mnemonic;
+    firstLoginPrivateKeyHex = privateKeyHex;
+  }
+
+  const tokenPayload: Record<string, string | boolean | undefined> = {
+    providerId: user.providerId,
+    providerType: user.providerType,
+    did: user.did,
+    email: user.email ?? "",
+    name: user.name,
+    walletAddress: user.walletAddress,
+  };
+
+  if (firstLoginMnemonic) {
+    tokenPayload.firstLogin = true;
+    tokenPayload.mnemonic = firstLoginMnemonic;
+    tokenPayload.privateKeyHex = firstLoginPrivateKeyHex;
+  }
+
+  const token = jwt.sign(tokenPayload, getJwtSecret(), { expiresIn: "24h" });
+
+  const redirect = new URL(returnBase);
+  redirect.searchParams.set("token", token);
+  if (firstLoginMnemonic) {
+    redirect.searchParams.set("firstLogin", "true");
+    redirect.searchParams.set("recovery", firstLoginMnemonic);
+  }
+  console.log(
+    `[auth] OAuth OK → redirect a ${redirect.origin}${redirect.pathname} (JWT, provider=${user.providerType}, id=${user.providerId.slice(0, 8)}…)`,
+  );
+  res.redirect(redirect.toString());
+}
+
+export function configureOAuthStrategies() {
   const clientID = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const callbackURL = process.env.GOOGLE_CALLBACK_URL;
@@ -107,6 +214,32 @@ export function configureGoogleAuth() {
       },
     ),
   );
+
+  const ghId = process.env.GITHUB_CLIENT_ID?.trim();
+  const ghSecret = process.env.GITHUB_CLIENT_SECRET?.trim();
+  const ghCb = process.env.GITHUB_CALLBACK_URL?.trim();
+  if (ghId && ghSecret && ghCb) {
+    passport.use(
+      "github",
+      new GitHubStrategy(
+        {
+          clientID: ghId,
+          clientSecret: ghSecret,
+          callbackURL: ghCb,
+          scope: ["user:email"],
+        },
+        (
+          _accessToken: string,
+          _refreshToken: string,
+          profile: GithubProfile,
+          done: (err: null, user: unknown) => void,
+        ) => {
+          done(null, { profile });
+        },
+      ),
+    );
+    githubStrategyRegistered = true;
+  }
 }
 
 router.get("/google", (req, res, next) => {
@@ -134,94 +267,18 @@ router.get(
     const returnBase = redirectBaseFromState(req, fallback);
     try {
       const { profile } = req.user as unknown as PassportGoogleState;
-      const googleId = profile.id;
-      const email = profile.emails?.[0]?.value ?? "";
+      const providerId = profile.id;
+      const email = profile.emails?.[0]?.value ?? null;
       const name = profile.displayName ?? "";
-      const picture = profile.photos?.[0]?.value ?? "";
+      const picture = profile.photos?.[0]?.value ?? null;
 
-      let user = await db.findUserByGoogleId(googleId);
-      let firstLoginMnemonic: string | undefined;
-      let firstLoginPrivateKeyHex: string | undefined;
-
-      if (!user) {
-        const mnemonic = generateMnemonic(wordlist, 256);
-        const keypair = Ed25519Keypair.deriveKeypair(mnemonic);
-        const {
-          did,
-          didDocument,
-          DIDCreationTx,
-          walletAddress,
-          privateKeyHex,
-          didGasMode,
-        } = await createDid(keypair, { mnemonic });
-
-        const { secretKey } = decodeIotaPrivateKey(keypair.getSecretKey());
-        const { encryptedPrivateKey, iv, salt } = encryptAgentPrivateKey(googleId, secretKey);
-
-        let airdropTxHash: string | undefined;
-        if (process.env.WELCOME_AIRDROP_ENABLED?.toLowerCase() === "true") {
-          try {
-            const amountIota = Number.parseFloat(process.env.WELCOME_AIRDROP_AMOUNT ?? "0");
-            if (amountIota > 0) {
-              const nanos = BigInt(Math.round(amountIota * 1e9));
-              const digest = await transferFromMaster(walletAddress, nanos);
-              airdropTxHash = digest;
-              console.log(
-                `[auth] Welcome airdrop: sent ${amountIota} IOTA to ${walletAddress} (tx: ${digest})`,
-              );
-            }
-          } catch (airErr) {
-            console.warn("[auth] Welcome airdrop fallito (login continua):", airErr);
-          }
-        }
-
-        user = {
-          googleId,
-          email,
-          name,
-          picture,
-          did,
-          didDocument,
-          DIDCreationTx,
-          didGasMode,
-          walletAddress,
-          encryptedPrivateKey,
-          iv,
-          salt,
-          ...(airdropTxHash ? { airdropTxHash } : {}),
-          createdAt: new Date().toISOString(),
-        };
-        await db.addUser(user);
-        firstLoginMnemonic = mnemonic;
-        firstLoginPrivateKeyHex = privateKeyHex;
-      }
-
-      const tokenPayload: Record<string, string | boolean | undefined> = {
-        googleId: user.googleId,
-        did: user.did,
-        email: user.email,
-        name: user.name,
-        walletAddress: user.walletAddress,
-      };
-
-      if (firstLoginMnemonic) {
-        tokenPayload.firstLogin = true;
-        tokenPayload.mnemonic = firstLoginMnemonic;
-        tokenPayload.privateKeyHex = firstLoginPrivateKeyHex;
-      }
-
-      const token = jwt.sign(tokenPayload, getJwtSecret(), { expiresIn: "24h" });
-
-      const redirect = new URL(returnBase);
-      redirect.searchParams.set("token", token);
-      if (firstLoginMnemonic) {
-        redirect.searchParams.set("firstLogin", "true");
-        redirect.searchParams.set("recovery", firstLoginMnemonic);
-      }
-      console.log(
-        `[auth] OAuth OK → redirect a ${redirect.origin}${redirect.pathname} (token JWT emesso, googleId=${user.googleId.slice(0, 8)}…)`,
-      );
-      res.redirect(redirect.toString());
+      await completeOAuthLogin(res, returnBase, {
+        providerType: "google",
+        providerId,
+        email,
+        name,
+        picture,
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Errore durante il login";
       console.error("[auth] OAuth callback errore (es. IOTA/faucet):", msg);
@@ -233,10 +290,70 @@ router.get(
   },
 );
 
+router.get("/github", (req, res, next) => {
+  if (!githubStrategyRegistered) {
+    res.status(503).json({ error: "GitHub OAuth non configurato (GITHUB_CLIENT_ID / SECRET / CALLBACK_URL)" });
+    return;
+  }
+  try {
+    const fallback = getFrontendUrl();
+    const rt = req.query.return_to;
+    const returnToParam = Array.isArray(rt) ? rt[0] : rt;
+    const returnTo = resolveReturnToFromQuery(returnToParam, fallback);
+    const state = encodeOAuthReturnState(returnTo);
+    passport.authenticate("github", {
+      session: false,
+      state,
+    })(req, res, next);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get(
+  "/github/callback",
+  (req, res, next) => {
+    if (!githubStrategyRegistered) {
+      res.status(503).json({ error: "GitHub OAuth non configurato" });
+      return;
+    }
+    passport.authenticate("github", {
+      session: false,
+      failureRedirect: `${getFrontendUrl()}?error=github_auth`,
+    })(req, res, next);
+  },
+  async (req, res) => {
+    const fallback = getFrontendUrl();
+    const returnBase = redirectBaseFromState(req, fallback);
+    try {
+      const { profile } = req.user as unknown as { profile: GithubProfile };
+      const providerId = String(profile.id);
+      const email = profile.emails?.[0]?.value ?? null;
+      const name = (profile.displayName || profile.username || "").trim() || profile.username || "";
+      const picture = profile.photos?.[0]?.value ?? null;
+
+      await completeOAuthLogin(res, returnBase, {
+        providerType: "github",
+        providerId,
+        email,
+        name,
+        picture,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Errore durante il login";
+      console.error("[auth] GitHub OAuth callback errore:", msg);
+      const redirect = new URL(returnBase);
+      redirect.searchParams.set("error", "oauth_callback");
+      redirect.searchParams.set("detail", msg.slice(0, 200));
+      res.redirect(redirect.toString());
+    }
+  },
+);
+
 router.get("/me", requireJwt, async (req, res) => {
   try {
     const jwtUser = req.user as JwtUserPayload;
-    const user = await db.findUserByGoogleId(jwtUser.googleId);
+    const user = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
     if (!user) {
       res.status(404).json({ error: "Utente non trovato" });
       return;

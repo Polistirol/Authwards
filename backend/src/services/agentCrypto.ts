@@ -8,7 +8,7 @@ function deriveKey(scopeId: string, salt: Buffer): Buffer {
   return crypto.pbkdf2Sync(`${jwtSecret}${scopeId}`, salt, PBKDF2_ITERATIONS, 32, "sha256");
 }
 
-/** Cifratura AES-256-GCM; `scopeId` = `googleId` (utenti) o DID agente (agenti), pepper PBKDF2 con JWT_SECRET. */
+/** Cifratura AES-256-GCM; `scopeId` = `providerId` utente o DID agente, pepper PBKDF2 con JWT_SECRET. */
 export function encryptAgentPrivateKey(scopeId: string, secretSeed: Uint8Array): {
   encryptedPrivateKey: string;
   iv: string;
@@ -26,9 +26,10 @@ export function encryptAgentPrivateKey(scopeId: string, secretSeed: Uint8Array):
   };
 }
 
-/** Decripta il seed del wallet utente (PBKDF2 con `googleId`; fallback su `did` per record legacy). */
+/** Decripta il seed del wallet utente (PBKDF2 con `providerId`; fallback su `googleId` legacy e `did`). */
 export function decryptUserWalletSecret(user: {
-  googleId: string;
+  providerId: string;
+  googleId?: string;
   did: string;
   encryptedPrivateKey?: string;
   iv?: string;
@@ -37,9 +38,17 @@ export function decryptUserWalletSecret(user: {
   if (!user.encryptedPrivateKey || !user.iv || !user.salt) {
     throw new Error("Dati cifratura wallet mancanti");
   }
+  const legacyGoogle = user.googleId;
   try {
-    return decryptPrivateKey(user.googleId, user.encryptedPrivateKey, user.iv, user.salt);
+    return decryptPrivateKey(user.providerId, user.encryptedPrivateKey, user.iv, user.salt);
   } catch {
+    if (legacyGoogle) {
+      try {
+        return decryptPrivateKey(legacyGoogle, user.encryptedPrivateKey, user.iv, user.salt);
+      } catch {
+        return decryptPrivateKey(user.did, user.encryptedPrivateKey, user.iv, user.salt);
+      }
+    }
     return decryptPrivateKey(user.did, user.encryptedPrivateKey, user.iv, user.salt);
   }
 }

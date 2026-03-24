@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 
 import { normalizeAgentLogList } from "./agentLogUtils";
-import { IotaAuthContext } from "./IotaAuthProvider";
+import { IotaAuthContext } from "./IotaAuthContext";
 import type { Agent, AgentLog } from "./types";
 
 function trimTrailingSlash(url: string): string {
@@ -12,16 +12,28 @@ export type CreateAgentResult = {
   agentDid: string;
   walletAddress: string;
   agentToken: string;
-  permissionProfile: string;
+  permissionProfile?: string;
+  permitMaxPerTxIota?: string;
+  permitMaxPerDayIota?: string;
+  permitExpiresAtMs?: string;
   status: string;
   name: string;
   description: string;
+  permitObjectId?: string | null;
+  permitExplorerUrl?: string | null;
 };
 
 export type CreateAgentInput = {
   permissionProfile: string;
   name: string;
   description: string;
+  /** Obbligatori se permissionProfile è `custom` (IOTA interi >= 0). */
+  customMaxPerTxIota?: number;
+  customMaxPerDayIota?: number;
+  /** Timestamp ms Unix; 0 o omit = senza scadenza. */
+  permitExpiresAtMs?: number | null;
+  taskType?: string;
+  taskConfig?: { shipmentId: string; action?: string };
 };
 
 export type UseAgentResult = {
@@ -34,6 +46,8 @@ export type UseAgentResult = {
   /** Carica log statici da GET /agent/logs/:agentDid (nessun WebSocket). */
   fetchAgentLogs: (agentDid: string) => Promise<void>;
   revokeAgent: (agentDid: string) => Promise<boolean>;
+  /** Attiva l’agente dalla dashboard (POST /agent/:agentDid/activate). */
+  activateAgent: (agentDid: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
 export function useAgent(): UseAgentResult {
@@ -138,14 +152,30 @@ export function useAgent(): UseAgentResult {
         return null;
       }
       try {
+        const body: Record<string, unknown> = {
+          permissionProfile: input.permissionProfile,
+          name: input.name.trim(),
+          description: input.description.trim(),
+        };
+        if (input.permissionProfile === "custom") {
+          if (input.customMaxPerTxIota !== undefined) {
+            body.customMaxPerTxIota = input.customMaxPerTxIota;
+          }
+          if (input.customMaxPerDayIota !== undefined) {
+            body.customMaxPerDayIota = input.customMaxPerDayIota;
+          }
+        }
+        if (input.permitExpiresAtMs !== undefined && input.permitExpiresAtMs !== null) {
+          body.permitExpiresAtMs = input.permitExpiresAtMs;
+        }
+        if (input.taskType) {
+          body.taskType = input.taskType;
+          if (input.taskConfig) body.taskConfig = input.taskConfig;
+        }
         const res = await fetch(`${trimTrailingSlash(backendUrl)}/agent/create`, {
           method: "POST",
           headers: { ...authHeaders(), "Content-Type": "application/json" },
-          body: JSON.stringify({
-            permissionProfile: input.permissionProfile,
-            name: input.name.trim(),
-            description: input.description.trim(),
-          }),
+          body: JSON.stringify(body),
         });
         if (!res.ok) {
           console.error("[@iota-auth/sdk] POST /agent/create failed:", res.status, await res.text());
@@ -185,6 +215,38 @@ export function useAgent(): UseAgentResult {
     [backendUrl, token, authHeaders, loadAgents],
   );
 
+  const activateAgent = useCallback(
+    async (agentDid: string): Promise<{ ok: boolean; error?: string }> => {
+      if (!token) {
+        return { ok: false, error: "Non autenticato" };
+      }
+      try {
+        const res = await fetch(
+          `${trimTrailingSlash(backendUrl)}/agent/${encodeURIComponent(agentDid)}/activate`,
+          { method: "POST", headers: authHeaders() },
+        );
+        const text = await res.text();
+        if (!res.ok) {
+          let errMsg = text;
+          try {
+            const j = JSON.parse(text) as { error?: unknown; message?: unknown };
+            if (typeof j.message === "string") errMsg = j.message;
+            else if (typeof j.error === "string") errMsg = j.error;
+          } catch {
+            /* use text */
+          }
+          return { ok: false, error: errMsg };
+        }
+        await loadAgents(true);
+        return { ok: true };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Errore di rete";
+        return { ok: false, error: msg };
+      }
+    },
+    [backendUrl, token, authHeaders, loadAgents],
+  );
+
   return {
     agents,
     loading,
@@ -193,5 +255,6 @@ export function useAgent(): UseAgentResult {
     agentLogs,
     fetchAgentLogs,
     revokeAgent,
+    activateAgent,
   };
 }

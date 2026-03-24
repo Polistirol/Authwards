@@ -5,11 +5,66 @@ import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
 import * as db from "../services/db.js";
 import { createAgentDid } from "../services/did.js";
 import { deriveAgentKeypair } from "../services/keyDerivation.js";
+import {
+  createPermitOnChain,
+  isPermitContractConfigured,
+  permitExplorerUrl,
+  reactivatePermitOnChain,
+} from "../services/permitContract.js";
 import type { AgentTaskConfig, AgentTaskType, DbAgent, PermissionProfile } from "../types/db.js";
 
 const router = Router();
 
-const PROFILES: PermissionProfile[] = ["readonly", "low_value", "full_access"];
+const PROFILES: PermissionProfile[] = ["readonly", "custom", "full_access", "low_value"];
+
+function parsePermitExpiresAtMs(body: Record<string, unknown>): bigint {
+  const v = body.permitExpiresAtMs;
+  if (v === null || v === undefined || v === "") return 0n;
+  if (typeof v === "number" && Number.isFinite(v)) {
+    const n = Math.floor(v);
+    return n <= 0 ? 0n : BigInt(n);
+  }
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (!t || t === "0") return 0n;
+    if (/^\d+$/.test(t)) return BigInt(t);
+  }
+  return 0n;
+}
+
+function resolvePermitIotaLimits(
+  profile: PermissionProfile,
+  body: Record<string, unknown>,
+): { ok: true; maxPerTx: string; maxPerDay: string } | { ok: false; error: string } {
+  if (profile === "readonly") {
+    return { ok: true, maxPerTx: "0", maxPerDay: "0" };
+  }
+  if (profile === "full_access") {
+    return { ok: true, maxPerTx: "1000", maxPerDay: "10000" };
+  }
+  if (profile === "low_value") {
+    return { ok: true, maxPerTx: "5", maxPerDay: "20" };
+  }
+  if (profile === "custom") {
+    const tx = body.customMaxPerTxIota;
+    const day = body.customMaxPerDayIota;
+    const nTx = typeof tx === "number" ? tx : typeof tx === "string" ? parseFloat(tx) : NaN;
+    const nDay = typeof day === "number" ? day : typeof day === "string" ? parseFloat(day) : NaN;
+    if (!Number.isFinite(nTx) || !Number.isFinite(nDay) || nTx < 0 || nDay < 0) {
+      return {
+        ok: false,
+        error: "Per permissionProfile custom servono customMaxPerTxIota e customMaxPerDayIota (numeri >= 0)",
+      };
+    }
+    const maxTx = Math.floor(nTx);
+    const maxDay = Math.floor(nDay);
+    if (maxTx > 1_000_000_000 || maxDay > 1_000_000_000) {
+      return { ok: false, error: "Limiti custom fuori range (max 1e9 IOTA per campo)" };
+    }
+    return { ok: true, maxPerTx: String(maxTx), maxPerDay: String(maxDay) };
+  }
+  return { ok: false, error: "permissionProfile non valido" };
+}
 
 function maskToken(t: string | undefined): string | undefined {
   if (!t) return undefined;
@@ -18,10 +73,11 @@ function maskToken(t: string | undefined): string | undefined {
 }
 
 function effectiveStatus(a: { status?: string; active?: boolean }): string {
+  if (a.status === "pending_activation") return "created";
   if (a.status) return a.status;
   if (a.active === false) return "revoked";
   if (a.active === true) return "active";
-  return "pending_activation";
+  return "created";
 }
 
 router.post("/create", requireJwt, async (req, res) => {
@@ -30,10 +86,19 @@ router.post("/create", requireJwt, async (req, res) => {
     const permissionProfile = req.body?.permissionProfile as PermissionProfile | undefined;
     if (!permissionProfile || !PROFILES.includes(permissionProfile)) {
       res.status(400).json({
-        error: 'Body richiede { permissionProfile: "readonly" | "low_value" | "full_access" }',
+        error:
+          'Body richiede { permissionProfile: "readonly" | "custom" | "full_access" | "low_value" }',
       });
       return;
     }
+
+    const body = req.body as Record<string, unknown>;
+    const limits = resolvePermitIotaLimits(permissionProfile, body);
+    if (!limits.ok) {
+      res.status(400).json({ error: limits.error });
+      return;
+    }
+    const permitExpiresAtMs = parsePermitExpiresAtMs(body);
 
     const taskType = req.body?.taskType as AgentTaskType | undefined;
     const taskConfigBody = req.body?.taskConfig as
@@ -60,14 +125,14 @@ router.post("/create", requireJwt, async (req, res) => {
       return;
     }
 
-    const user = await db.findUserByGoogleId(jwtUser.googleId);
+    const user = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
     if (!user?.walletAddress) {
       res.status(400).json({ error: "walletAddress utente mancante: completa prima l’onboarding OAuth" });
       return;
     }
 
     const idx = user.nextAgentIndex ?? 0;
-    const { keypair } = deriveAgentKeypair(user.googleId, user.walletAddress, idx);
+    const { keypair } = deriveAgentKeypair(user.providerId, user.walletAddress, idx);
 
     const { did: agentDid, walletAddress, DIDCreationTx } = await createAgentDid({
       agentKeypair: keypair,
@@ -91,14 +156,18 @@ router.post("/create", requireJwt, async (req, res) => {
       name,
       description,
       ownerDid: jwtUser.did,
-      ownerGoogleId: jwtUser.googleId,
+      ownerProviderId: jwtUser.providerId,
+      ownerProviderType: jwtUser.providerType,
       walletAddress,
       DIDCreationTx,
       permissionProfile,
+      permitMaxPerTxIota: limits.maxPerTx,
+      permitMaxPerDayIota: limits.maxPerDay,
+      permitExpiresAtMs: permitExpiresAtMs.toString(),
       agentToken,
       agentIndex: idx,
       permitObjectId: null,
-      status: "pending_activation",
+      status: "created",
       activatedAt: null,
       taskType,
       taskConfig,
@@ -106,16 +175,40 @@ router.post("/create", requireJwt, async (req, res) => {
     };
 
     await db.addAgent(row);
-    await db.updateUserByGoogleId(jwtUser.googleId, { nextAgentIndex: idx + 1 });
+    await db.updateUserByProvider(jwtUser.providerId, jwtUser.providerType, { nextAgentIndex: idx + 1 });
+
+    let permitObjectId: string | null = null;
+    if (isPermitContractConfigured()) {
+      try {
+        const created = await createPermitOnChain({
+          agentDid,
+          ownerDid: jwtUser.did,
+          maxPerTx: BigInt(limits.maxPerTx),
+          maxPerDay: BigInt(limits.maxPerDay),
+          expiresAtMs: permitExpiresAtMs,
+        });
+        permitObjectId = created.permitObjectId;
+        await db.updateAgentByDid(agentDid, { permitObjectId });
+        console.log(
+          `[agent/create] AgentPermit on-chain creato: ${permitObjectId} (tx ${created.txHash})`,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[agent/create] Creazione AgentPermit on-chain fallita (fallback db.json):", msg);
+      }
+    } else {
+      console.log("AgentPermit contract not configured, skipping on-chain permit");
+    }
 
     res.json({
       agentDid: row.agentDid,
       walletAddress: row.walletAddress,
       agentToken: row.agentToken,
-      permissionProfile: row.permissionProfile,
-      status: row.status,
+      status: "created",
       name: row.name,
-      description: row.description,
+      description: row.description ?? "",
+      permitObjectId,
+      permitExplorerUrl: permitObjectId ? permitExplorerUrl(permitObjectId) : null,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Errore creazione agente";
@@ -126,7 +219,7 @@ router.post("/create", requireJwt, async (req, res) => {
 router.get("/list", requireJwt, async (req, res) => {
   try {
     const jwtUser = req.user as JwtUserPayload;
-    const agents = await db.findAgentsByOwner(jwtUser.googleId);
+    const agents = await db.findAgentsByOwner(jwtUser.providerId, jwtUser.providerType);
     const safe = agents.map((a) => {
       const {
         encryptedPrivateKey: _e,
@@ -135,10 +228,13 @@ router.get("/list", requireJwt, async (req, res) => {
         agentToken: tok,
         ...rest
       } = a;
+      const pid = a.permitObjectId ?? null;
       return {
         ...rest,
         agentToken: maskToken(tok),
         status: effectiveStatus(a),
+        permitObjectId: pid,
+        permitExplorerUrl: pid ? permitExplorerUrl(pid) : null,
       };
     });
     res.json(safe);
@@ -148,12 +244,68 @@ router.get("/list", requireJwt, async (req, res) => {
   }
 });
 
+router.post("/:agentDid/activate", requireJwt, async (req, res) => {
+  try {
+    const jwtUser = req.user as JwtUserPayload;
+    const agentDid = decodeURIComponent(req.params.agentDid);
+    const a = await db.findAgentByDid(agentDid);
+    if (!a || a.ownerProviderId !== jwtUser.providerId || a.ownerProviderType !== jwtUser.providerType) {
+      res.status(403).json({ error: "Agente non trovato o non autorizzato" });
+      return;
+    }
+    const st = effectiveStatus(a);
+    if (st === "active") {
+      res.status(400).json({ error: "already_active", message: "Agent is already active" });
+      return;
+    }
+    if (st === "revoked") {
+      res.status(400).json({ error: "agent_revoked", message: "Cannot activate a revoked agent" });
+      return;
+    }
+    if (st !== "created") {
+      res.status(400).json({ error: "invalid_status", message: "Agent must be in created state" });
+      return;
+    }
+
+    if (isPermitContractConfigured() && a.permitObjectId) {
+      const react = await reactivatePermitOnChain(a.permitObjectId);
+      if (!react.success) {
+        console.warn("[agent/activate] reactivate_permit on-chain:", react.error ?? "unknown");
+      } else if (react.txHash) {
+        console.log(`[agent/activate] AgentPermit reactivate_permit on-chain: ${react.txHash}`);
+      }
+    }
+
+    const activatedAt = new Date().toISOString();
+    await db.updateAgentByDid(a.agentDid, {
+      status: "active",
+      activatedAt,
+      active: true,
+    });
+
+    res.json({
+      status: "active",
+      agentDid: a.agentDid,
+      activatedAt,
+      permitObjectId: a.permitObjectId ?? null,
+      message: "Agent activated successfully",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Errore attivazione";
+    res.status(500).json({ error: msg });
+  }
+});
+
 router.get("/:agentDid/snippet", requireJwt, async (req, res) => {
   try {
     const jwtUser = req.user as JwtUserPayload;
     const agentDid = decodeURIComponent(req.params.agentDid);
     const agent = await db.findAgentByDid(agentDid);
-    if (!agent || agent.ownerGoogleId !== jwtUser.googleId) {
+    if (
+      !agent ||
+      agent.ownerProviderId !== jwtUser.providerId ||
+      agent.ownerProviderType !== jwtUser.providerType
+    ) {
       res.status(403).json({ error: "Agente non trovato o non autorizzato" });
       return;
     }
@@ -168,39 +320,35 @@ router.get("/:agentDid/snippet", requireJwt, async (req, res) => {
     const snippets = {
       n8n: {
         label: "n8n Workflow",
-        description: "Workflow HTTP per n8n",
+        description: "Workflow HTTP per n8n (dopo attivazione dalla dashboard)",
         steps: [
-          "1. Crea un workflow in n8n",
-          "2. Aggiungi un nodo Schedule Trigger (ogni 30 secondi)",
-          "3. Aggiungi un nodo HTTP Request con questi parametri:",
+          "1. Attiva l’agente dalla dashboard (bottone «Attiva Agente»).",
+          "2. Crea un workflow in n8n.",
+          "3. Aggiungi un nodo Schedule Trigger (es. ogni 30 secondi).",
+          "4. Aggiungi un nodo HTTP Request:",
           `   URL: ${platformUrl}/bridge/check`,
           "   Method: POST",
           `   Header: Authorization: Bearer ${agentToken}`,
-          "4. Aggiungi un nodo IF: $json.conditionMet == true",
-          "5. Se true, aggiungi un nodo HTTP Request:",
+          "5. Aggiungi un nodo IF: $json.conditionMet == true",
+          "6. Se true, aggiungi HTTP Request:",
           `   URL: ${platformUrl}/bridge/execute`,
           "   Method: POST",
           `   Header: Authorization: Bearer ${agentToken}`,
           '   Body: {"action": "release_payment"}',
-          "6. PRIMA DI TUTTO: attiva l'agente con una chiamata a:",
-          `   POST ${platformUrl}/bridge/activate`,
-          `   Header: Authorization: Bearer ${agentToken}`,
         ],
-        activateCommand: `curl -X POST ${platformUrl}/bridge/activate -H 'Authorization: Bearer ${agentToken}'`,
         checkCommand: `curl -X POST ${platformUrl}/bridge/check -H 'Authorization: Bearer ${agentToken}'`,
         executeCommand: `curl -X POST ${platformUrl}/bridge/execute -H 'Authorization: Bearer ${agentToken}' -H 'Content-Type: application/json' -d '{\"action\": \"release_payment\"}'`,
       },
       curl: {
         label: "cURL (generico)",
-        description: "Comandi cURL per test o integrazione custom",
-        activate: `curl -X POST ${platformUrl}/bridge/activate \\\n  -H 'Authorization: Bearer ${agentToken}'`,
+        description: "Comandi cURL (richiede agente già attivo dalla dashboard)",
         check: `curl -X POST ${platformUrl}/bridge/check \\\n  -H 'Authorization: Bearer ${agentToken}'`,
         execute: `curl -X POST ${platformUrl}/bridge/execute \\\n  -H 'Authorization: Bearer ${agentToken}' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"action\": \"release_payment\"}'`,
       },
       javascript: {
         label: "JavaScript / Node.js",
         description: "Codice JS per integrazione programmatica",
-        code: `const AGENT_TOKEN = '${agentToken}';\nconst API = '${platformUrl}/bridge';\n\n// 1. Attiva l'agente (una volta sola)\nawait fetch(\`\${API}/activate\`, {\n  method: 'POST',\n  headers: { 'Authorization': \`Bearer \${AGENT_TOKEN}\` }\n});\n\n// 2. Controlla la condizione\nconst check = await fetch(\`\${API}/check\`, {\n  method: 'POST',\n  headers: { 'Authorization': \`Bearer \${AGENT_TOKEN}\` }\n}).then(r => r.json());\n\n// 3. Se la condizione è vera, esegui\nif (check.conditionMet) {\n  const result = await fetch(\`\${API}/execute\`, {\n    method: 'POST',\n    headers: {\n      'Authorization': \`Bearer \${AGENT_TOKEN}\`,\n      'Content-Type': 'application/json'\n    },\n    body: JSON.stringify({ action: 'release_payment' })\n  }).then(r => r.json());\n  console.log('TX:', result.txHash);\n}`,
+        code: `const AGENT_TOKEN = '${agentToken}';\nconst API = '${platformUrl}/bridge';\n\n// L'agente deve essere già attivo dalla dashboard.\n\nconst check = await fetch(\`\${API}/check\`, {\n  method: 'POST',\n  headers: { 'Authorization': \`Bearer \${AGENT_TOKEN}\` }\n}).then(r => r.json());\n\nif (check.conditionMet) {\n  const result = await fetch(\`\${API}/execute\`, {\n    method: 'POST',\n    headers: {\n      'Authorization': \`Bearer \${AGENT_TOKEN}\`,\n      'Content-Type': 'application/json'\n    },\n    body: JSON.stringify({ action: 'release_payment' })\n  }).then(r => r.json());\n  console.log('TX:', result.txHash);\n}`,
       },
     };
 
@@ -225,7 +373,11 @@ router.get("/logs/:agentDid", requireJwt, async (req, res) => {
       typeof limitRaw === "string" ? Math.min(500, Math.max(1, parseInt(limitRaw, 10) || 50)) : 50;
 
     const agent = await db.findAgentByDid(agentDid);
-    if (!agent || agent.ownerGoogleId !== jwtUser.googleId) {
+    if (
+      !agent ||
+      agent.ownerProviderId !== jwtUser.providerId ||
+      agent.ownerProviderType !== jwtUser.providerType
+    ) {
       res.status(403).json({ error: "Agente non trovato o non autorizzato" });
       return;
     }

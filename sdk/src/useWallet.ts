@@ -1,6 +1,6 @@
 import { useCallback, useContext, useState } from "react";
 
-import { IotaAuthContext } from "./IotaAuthProvider";
+import { IotaAuthContext } from "./IotaAuthContext";
 
 export type WalletBalanceResponse = {
   address: string;

@@ -2,17 +2,25 @@ export type IotaAuthConfig = {
   backendUrl: string;
 };
 
+export type AuthProviderType = "google" | "github" | "wallet" | "telegram";
+
 export type User = {
-  googleId: string;
-  email: string;
+  providerId: string;
+  providerType: AuthProviderType;
+  email: string | null;
   name: string;
-  picture: string;
+  picture: string | null;
   did: string;
   didDocument: unknown;
   walletAddress?: string;
 };
 
-export type AgentStatus = "pending_activation" | "active" | "revoked";
+export type AgentStatus = "created" | "pending_activation" | "active" | "revoked";
+
+export type AgentTaskConfig = {
+  shipmentId?: string;
+  action?: string;
+};
 
 export type Agent = {
   agentDid: string;
@@ -21,6 +29,11 @@ export type Agent = {
   name?: string;
   description?: string;
   permissionProfile: string;
+  /** IOTA interi salvati alla creazione (profilo + custom). */
+  permitMaxPerTxIota?: string;
+  permitMaxPerDayIota?: string;
+  /** Scadenza permit (ms Unix); "0" = mai. */
+  permitExpiresAtMs?: string;
   createdAt: string;
   /** Legacy: preferire `status`. */
   active?: boolean;
@@ -31,6 +44,9 @@ export type Agent = {
   spentTodayDate?: string;
   /** Mascherato lato API (lista). */
   agentToken?: string;
+  taskType?: string;
+  taskConfig?: AgentTaskConfig;
+  permitObjectId?: string | null;
 };
 
 export type AgentLog = {

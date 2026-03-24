@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import type { PublicKey } from "@iota/iota-sdk/cryptography";
 import { decodeIotaPrivateKey } from "@iota/iota-sdk/cryptography";
 import { requestIotaFromFaucetV0 } from "@iota/iota-sdk/faucet";
 import type { IotaTransactionBlockResponse } from "@iota/iota-sdk/client";
@@ -118,6 +119,20 @@ async function attachExternalEd25519Method(
   await storage.keyIdStorage().insertKeyId(new MethodDigest(vm), keyId);
 }
 
+/** VM solo con chiave pubblica (login wallet: nessuna chiave privata lato server). */
+async function attachPublicOnlyEd25519Method(
+  storage: Storage,
+  doc: IotaDocument,
+  publicJwk: Jwk,
+  fragment: string,
+) {
+  const keyId = await storage.keyStorage().insert(publicJwk);
+  publicJwk.setKid(keyId);
+  const vm = VerificationMethod.newFromJwk(doc.id(), publicJwk, fragment);
+  doc.insertMethod(vm, MethodScope.VerificationMethod());
+  await storage.keyIdStorage().insertKeyId(new MethodDigest(vm), keyId);
+}
+
 async function createIdentityClientFromKeypair(
   iotaClient: IotaClient,
   payerKeypair: Ed25519Keypair,
@@ -199,6 +214,56 @@ export async function createDid(
     privateKeyHex,
     mnemonic,
     didGasMode: "master_payer",
+  };
+}
+
+/**
+ * DID per utente che ha solo il wallet estensione: la VM usa la chiave pubblica Ed25519
+ * verificata dalla firma (nessun seed sul backend).
+ */
+export async function createDidForWalletOwner(publicKey: PublicKey): Promise<{
+  did: string;
+  didDocument: Record<string, unknown>;
+  DIDCreationTx: string;
+  walletAddress: string;
+}> {
+  ensureWasm();
+  const walletAddress = publicKey.toIotaAddress();
+  const x = Buffer.from(publicKey.toRawBytes()).toString("base64url");
+  const publicJwk = new Jwk({
+    kty: JwkType.Okp,
+    crv: "Ed25519",
+    x,
+    alg: JwsAlgorithm.EdDSA,
+  });
+
+  const iotaClient = new IotaClient({ url: getNodeUrl() });
+  const storage = new Storage(new JwkMemStore(), new KeyIdMemStore());
+  const masterKp = getMasterKeypair();
+  const identityClient = await createIdentityClientFromKeypair(iotaClient, masterKp, {
+    fundFromFaucet: false,
+  });
+  const networkId = await getChainId(iotaClient);
+  const unpublished = new IotaDocument(networkId);
+  await attachPublicOnlyEd25519Method(storage, unpublished, publicJwk, "#key-1");
+
+  console.log(
+    "[did] Creazione DID wallet login: gas mode = master_payer, VM = chiave pubblica wallet (senza private key sul server)",
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const txb: any = identityClient.createIdentity(unpublished).finish();
+  const { output: identity, response: rawRes } = await txb
+    .withGasBudget(getDidGasBudget())
+    .buildAndExecute(identityClient);
+  const tx = unwrapTxResponse(rawRes);
+  const doc = identity.didDocument();
+  const did = doc.id().toString();
+  const didDocument = doc.toJSON() as Record<string, unknown>;
+  return {
+    did,
+    didDocument,
+    DIDCreationTx: tx.digest,
+    walletAddress,
   };
 }
 

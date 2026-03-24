@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import type { Agent } from "../../sdk";
-import { LoginModal, useAgent, useIotaAuth } from "../../sdk";
+import { ConnectButton, useAgent, useIotaAuth } from "../../sdk";
 
 const SESSION_KEY = "iota-auth:jwt";
 
@@ -160,7 +160,6 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
     useAgent();
 
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const [sections, setSections] = useState<Record<string, boolean>>({
     status: true,
     auth: true,
@@ -241,7 +240,7 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
 
   const handleLogin = () => {
     try {
-      pushLog("info", "useIotaAuth().login() — redirecting to Google OAuth");
+      pushLog("info", "useIotaAuth().login() — apre il modal (OAuth / wallet / Telegram)");
       login();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -356,20 +355,29 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
           padding: "12px 20px",
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 10,
         }}
       >
-        <span
-          title={headerLabel}
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: headerDot,
-            flexShrink: 0,
-          }}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <span
+            title={headerLabel}
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: headerDot,
+              flexShrink: 0,
+            }}
+          />
+          <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>IOTA Auth SDK — Test Console</h1>
+        </div>
+        <ConnectButton
+          theme="dark"
+          label="Connect"
+          onConnect={(u) => pushLog("success", `ConnectButton onConnect — ${u.did}`)}
+          onDisconnect={() => pushLog("info", "ConnectButton onDisconnect")}
         />
-        <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>IOTA Auth SDK — Test Console</h1>
       </header>
 
       <main
@@ -408,7 +416,7 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
                 </div>
                 <div>
                   <span style={{ color: C.muted }}>Email: </span>
-                  {user.email}
+                  {user.email ?? "—"}
                 </div>
                 <div>
                   <span style={{ color: C.muted }}>DID: </span>
@@ -453,23 +461,7 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
                   borderRadius: 4,
                 }}
               >
-                useIotaAuth().login()
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setModalOpen(true);
-                  pushLog("info", "Open &lt;LoginModal /&gt; (isOpen=true)");
-                }}
-                style={{
-                  padding: "8px 12px",
-                  background: C.pre,
-                  border: `1px solid ${C.border}`,
-                  color: C.text,
-                  borderRadius: 4,
-                }}
-              >
-                Open &lt;LoginModal /&gt;
+                login()
               </button>
             </div>
           )}
@@ -741,13 +733,6 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
         </SectionShell>
       </main>
 
-      <LoginModal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          pushLog("info", "LoginModal onClose()");
-        }}
-      />
     </div>
   );
 }

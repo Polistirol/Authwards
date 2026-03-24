@@ -13,12 +13,12 @@ function getPlatformSecret(): string {
  * Stessi input ⇒ stessa chiave (nessun salvataggio on-disk).
  */
 export function deriveAgentKeypair(
-  ownerGoogleId: string,
+  ownerProviderId: string,
   ownerWalletAddress: string,
   agentIndex: number,
 ): { keypair: Ed25519Keypair; walletAddress: string; seed: Uint8Array } {
   const ikm = Buffer.from(getPlatformSecret(), "utf8");
-  const salt = Buffer.from(`${ownerGoogleId}${ownerWalletAddress}`, "utf8");
+  const salt = Buffer.from(`${ownerProviderId}${ownerWalletAddress}`, "utf8");
   const info = Buffer.from(`agent-keypair-v1-${agentIndex}`, "utf8");
   const seed = new Uint8Array(crypto.hkdfSync("sha256", ikm, salt, info, 32));
   const keypair = Ed25519Keypair.fromSecretKey(seed);

@@ -7,14 +7,12 @@ type SnippetBundle = {
     label: string;
     description: string;
     steps: string[];
-    activateCommand: string;
     checkCommand: string;
     executeCommand: string;
   };
   curl: {
     label: string;
     description: string;
-    activate: string;
     check: string;
     execute: string;
   };
@@ -175,14 +173,15 @@ export default function SnippetModal({
 
   if (!open) return null;
 
-  const pending = agentStatus === "pending_activation";
+  const pending =
+    agentStatus === "pending_activation" || agentStatus === "created";
 
   const statusLabel =
     agentStatus === "active"
       ? "Attivo"
       : agentStatus === "revoked"
         ? "Revocato"
-        : "In attesa di attivazione";
+        : "Non attivato";
 
   return (
     <div
@@ -215,8 +214,8 @@ export default function SnippetModal({
 
           {pending ? (
             <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-              Questo agente non è ancora attivo. Usa lo snippet per attivarlo
-              tramite il comando <code className="text-amber-50">/bridge/activate</code>.
+              Questo agente non è ancora attivo. Attivalo dalla dashboard con il
+              bottone «Attiva Agente»; poi collega n8n con gli URL sotto.
             </div>
           ) : null}
 
@@ -318,14 +317,6 @@ export default function SnippetModal({
                     {copyMain === "n8n-steps" ? "Copiato ✓" : "Copia istruzioni"}
                   </button>
                   <CodeBlock
-                    label="Activate"
-                    code={data.snippets.n8n.activateCommand}
-                    copied={copyMain === "n8n-act"}
-                    onCopy={() =>
-                      void copyText("n8n-act", data.snippets.n8n.activateCommand)
-                    }
-                  />
-                  <CodeBlock
                     label="Check"
                     code={data.snippets.n8n.checkCommand}
                     copied={copyMain === "n8n-check"}
@@ -352,14 +343,6 @@ export default function SnippetModal({
                   <p className="mt-1 text-sm text-slate-400">
                     {data.snippets.curl.description}
                   </p>
-                  <CodeBlock
-                    label="activate"
-                    code={data.snippets.curl.activate}
-                    copied={copyMain === "curl-a"}
-                    onCopy={() =>
-                      void copyText("curl-a", data.snippets.curl.activate)
-                    }
-                  />
                   <CodeBlock
                     label="check"
                     code={data.snippets.curl.check}

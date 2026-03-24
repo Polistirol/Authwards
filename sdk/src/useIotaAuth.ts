@@ -1,7 +1,7 @@
 import { useContext, useMemo } from "react";
 
-import { IotaAuthContext } from "./IotaAuthProvider";
-import type { User } from "./types";
+import { IotaAuthContext } from "./IotaAuthContext";
+import type { AuthProviderType, User } from "./types";
 
 export type UseIotaAuthResult = {
   user: User | null;
@@ -9,18 +9,28 @@ export type UseIotaAuthResult = {
   walletAddress: string | undefined;
   isAuthenticated: boolean;
   loading: boolean;
-  /** JWT session (solo in memoria / sessionStorage lato provider). */
   token: string | null;
-  login: () => void;
+  /**
+   * Senza argomento apre il modal di login.
+   * Con provider avvia OAuth (google/github), wallet, o modal (telegram).
+   */
+  login: (provider?: AuthProviderType) => void;
+  /** @deprecated Usare login('github'). */
+  loginGitHub: () => void;
+  /** Flusso challenge-response con estensione wallet IOTA. */
+  connectWallet: () => Promise<void>;
   logout: () => void;
-  /** URL backend (stesso valore del provider). */
   backendUrl: string;
-  /** True solo dopo il primo OAuth con recovery in query. */
   isFirstLogin: boolean;
-  /** Mnemonic one-shot dopo il primo login; poi null (es. dopo logout). */
   recoveryPhrase: string | null;
-  /** Chiudi il welcome e rimuovi recovery / first-login dalla memoria React. */
   acknowledgeFirstLogin: () => void;
+  /** Salva JWT dopo login wallet/telegram in-page. */
+  completeSession: (token: string, user: User) => void;
+  telegramLoginEnabled?: boolean;
+  /** @deprecated Usare telegramLoginEnabled. */
+  telegramBotUsername?: string;
+  telegramPopupError: string | null;
+  iotaWalletDownloadUrl: string;
 };
 
 export function useIotaAuth(): UseIotaAuthResult {
@@ -34,11 +44,18 @@ export function useIotaAuth(): UseIotaAuthResult {
     token,
     loading,
     login,
+    loginGitHub,
+    connectWallet,
+    completeSession,
     logout,
     backendUrl,
     recoveryPhrase,
     isFirstLogin,
     acknowledgeFirstLogin,
+    telegramLoginEnabled,
+    telegramBotUsername,
+    telegramPopupError,
+    iotaWalletDownloadUrl,
   } = ctx;
 
   return useMemo(
@@ -50,22 +67,36 @@ export function useIotaAuth(): UseIotaAuthResult {
       loading,
       token,
       login,
+      loginGitHub,
+      connectWallet,
+      completeSession,
       logout,
       backendUrl,
       isFirstLogin,
       recoveryPhrase,
       acknowledgeFirstLogin,
+      telegramLoginEnabled,
+      telegramBotUsername,
+      telegramPopupError,
+      iotaWalletDownloadUrl,
     }),
     [
       user,
       token,
       loading,
       login,
+      loginGitHub,
+      connectWallet,
+      completeSession,
       logout,
       backendUrl,
       isFirstLogin,
       recoveryPhrase,
       acknowledgeFirstLogin,
+      telegramLoginEnabled,
+      telegramBotUsername,
+      telegramPopupError,
+      iotaWalletDownloadUrl,
     ],
   );
 }

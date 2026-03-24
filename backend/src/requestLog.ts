@@ -21,7 +21,7 @@ function pathOnly(req: Request): string {
 
 /**
  * Logga richieste HTTP:
- * - Sempre: POST/PUT/PATCH/DELETE, risposte ≥400, GET OAuth `/auth/google*`
+ * - Sempre: POST/PUT/PATCH/DELETE, risposte ≥400, GET OAuth `/auth/google*`, `/auth/github*`
  * - Solo se `LOG_HTTP_VERBOSE=true`: altri GET/HEAD
  */
 export function requestLogMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -42,7 +42,12 @@ export function requestLogMiddleware(req: Request, res: Response, next: NextFunc
     }
 
     if (method === "GET" || method === "HEAD") {
-      if (path.startsWith("/auth/google")) {
+      if (
+        path.startsWith("/auth/google") ||
+        path.startsWith("/auth/github") ||
+        path.startsWith("/auth/wallet") ||
+        path.startsWith("/auth/telegram")
+      ) {
         console.log(line);
         return;
       }

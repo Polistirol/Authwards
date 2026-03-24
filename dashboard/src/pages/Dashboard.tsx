@@ -93,34 +93,48 @@ function DidDocumentBlock({ user }: { user: User }) {
 }
 
 function effectiveAgentStatus(agent: Agent): AgentStatus {
+  if (agent.status === "pending_activation") return "created";
   if (agent.status) return agent.status;
   if (agent.active === false) return "revoked";
   if (agent.active === true) return "active";
-  return "pending_activation";
-}
-
-function truncateDidToast(did: string): string {
-  if (did.length <= 24) return did;
-  return `${did.slice(0, 14)}…${did.slice(-8)}`;
+  return "created";
 }
 
 const PROFILES = [
   {
     id: "readonly" as const,
-    title: "Read Only",
-    description: "Monitora senza eseguire transazioni",
+    title: "Read only",
+    description: "Nessuna spesa; solo monitoraggio",
   },
   {
-    id: "low_value" as const,
-    title: "Low Value",
-    description: "Max 5 IOTA per transazione, 20/giorno",
+    id: "custom" as const,
+    title: "Personalizzato",
+    description: "Imposta tu max IOTA per transazione e per giorno",
   },
   {
     id: "full_access" as const,
-    title: "Full Access",
-    description: "Nessun limite",
+    title: "Full access",
+    description: "Massimi consentiti dal contratto (1000 / 10000 IOTA al giorno)",
   },
 ];
+
+function defaultExpiresLocal(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+function formatIotaFromNanos(nanos: string | undefined): string {
+  try {
+    const n = BigInt(nanos ?? "0");
+    const v = Number(n) / 1e9;
+    if (Number.isNaN(v)) return "0";
+    return v >= 1 ? v.toFixed(4) : v.toFixed(6);
+  } catch {
+    return "0";
+  }
+}
 
 export default function Dashboard() {
   const { user, did, isAuthenticated, loading, logout, backendUrl, token } =
@@ -133,6 +147,7 @@ export default function Dashboard() {
     fetchAgentLogs,
     revokeAgent,
     refreshAgents,
+    activateAgent,
   } = useAgent();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -141,17 +156,21 @@ export default function Dashboard() {
     null,
   );
   const [profile, setProfile] = useState<
-    "readonly" | "low_value" | "full_access"
+    "readonly" | "custom" | "full_access"
   >("readonly");
+  const [customMaxPerTx, setCustomMaxPerTx] = useState(5);
+  const [customMaxPerDay, setCustomMaxPerDay] = useState(20);
+  const [noPermitExpiry, setNoPermitExpiry] = useState(true);
+  const [expiresAtLocal, setExpiresAtLocal] = useState(defaultExpiresLocal);
   const [agentName, setAgentName] = useState("");
   const [agentDescription, setAgentDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [didCopied, setDidCopied] = useState(false);
+  const [walletCopied, setWalletCopied] = useState(false);
+  const [userBalanceNanos, setUserBalanceNanos] = useState<string | null>(null);
 
   const [snippetAgentDid, setSnippetAgentDid] = useState<string | null>(null);
-  const [snippetStatus, setSnippetStatus] = useState<AgentStatus>(
-    "pending_activation",
-  );
+  const [snippetStatus, setSnippetStatus] = useState<AgentStatus>("created");
 
   const [fundAddress, setFundAddress] = useState<string | null>(null);
 
@@ -162,13 +181,21 @@ export default function Dashboard() {
     for (const a of agents) {
       const cur = effectiveAgentStatus(a);
       const prev = prevStatusRef.current.get(a.agentDid);
-      if (prev === "pending_activation" && cur === "active") {
-        setToast(`L'agente ${truncateDidToast(a.agentDid)} è stato attivato!`);
+      if (
+        (prev === "created" || prev === "pending_activation") &&
+        cur === "active"
+      ) {
+        setToast("Agente attivato!");
         window.setTimeout(() => setToast(null), 6000);
       }
       prevStatusRef.current.set(a.agentDid, cur);
     }
   }, [agents]);
+
+  const trimBackend = useCallback(
+    () => backendUrl.replace(/\/+$/, ""),
+    [backendUrl],
+  );
 
   const copyDid = useCallback(async () => {
     if (!did) return;
@@ -181,22 +208,86 @@ export default function Dashboard() {
     }
   }, [did]);
 
+  const copyWallet = useCallback(async () => {
+    const w = user?.walletAddress;
+    if (!w) return;
+    try {
+      await navigator.clipboard.writeText(w);
+      setWalletCopied(true);
+      setTimeout(() => setWalletCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }, [user?.walletAddress]);
+
+  useEffect(() => {
+    const addr = user?.walletAddress;
+    if (!addr) {
+      setUserBalanceNanos(null);
+      return;
+    }
+    let cancelled = false;
+    const url = `${trimBackend()}/wallet/balance/${encodeURIComponent(addr)}`;
+    async function load(): Promise<void> {
+      try {
+        const res = await fetch(url);
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as { balance?: string };
+        if (!cancelled && json.balance !== undefined) {
+          setUserBalanceNanos(json.balance);
+        }
+      } catch {
+        if (!cancelled) setUserBalanceNanos(null);
+      }
+    }
+    void load();
+    const id = setInterval(() => void load(), 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [user?.walletAddress, trimBackend]);
+
   const openSnippetFor = useCallback((agent: Agent) => {
     setSnippetAgentDid(agent.agentDid);
     setSnippetStatus(effectiveAgentStatus(agent));
   }, []);
 
   function resetCreateDialog(): void {
+    setCreating(false);
     setCreateOpen(false);
     setCreateStep("pick");
     setCreateResult(null);
     setAgentName("");
     setAgentDescription("");
+    setProfile("readonly");
+    setCustomMaxPerTx(5);
+    setCustomMaxPerDay(20);
+    setNoPermitExpiry(true);
+    setExpiresAtLocal(defaultExpiresLocal());
   }
 
   async function handleCreateAgent(): Promise<void> {
     if (!agentName.trim()) {
       return;
+    }
+    if (profile === "custom") {
+      if (
+        !Number.isFinite(customMaxPerTx) ||
+        !Number.isFinite(customMaxPerDay) ||
+        customMaxPerTx < 0 ||
+        customMaxPerDay < 0
+      ) {
+        return;
+      }
+    }
+    let permitExpiresAtMs = 0;
+    if (!noPermitExpiry) {
+      const t = new Date(expiresAtLocal).getTime();
+      if (Number.isNaN(t)) {
+        return;
+      }
+      permitExpiresAtMs = t;
     }
     setCreating(true);
     try {
@@ -204,6 +295,13 @@ export default function Dashboard() {
         permissionProfile: profile,
         name: agentName.trim(),
         description: agentDescription.trim(),
+        ...(profile === "custom"
+          ? {
+              customMaxPerTxIota: customMaxPerTx,
+              customMaxPerDayIota: customMaxPerDay,
+            }
+          : {}),
+        permitExpiresAtMs,
       });
       if (result) {
         setCreateResult(result);
@@ -249,7 +347,7 @@ export default function Dashboard() {
             />
             <div>
               <p className="font-semibold text-white">{user.name}</p>
-              <p className="text-sm text-slate-500">{user.email}</p>
+              <p className="text-sm text-slate-500">{user.email ?? "—"}</p>
             </div>
           </div>
           <button
@@ -266,7 +364,41 @@ export default function Dashboard() {
         <section>
           <h2 className="text-lg font-semibold text-white">La tua identità</h2>
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <div className="border-b border-white/10 pb-6">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Wallet
+              </p>
+              {user.walletAddress ? (
+                <>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <code className="break-all font-mono text-sm text-[#6ee7b7]">
+                      {user.walletAddress}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => void copyWallet()}
+                      className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-xs text-[#6ee7b7] hover:bg-white/10"
+                    >
+                      {walletCopied ? "Copiato" : "Copia"}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-300">
+                    Saldo:{" "}
+                    <span className="font-mono text-[#6ee7b7]">
+                      {userBalanceNanos !== null
+                        ? `${formatIotaFromNanos(userBalanceNanos)} IOTA`
+                        : "…"}
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">
+                  Nessun wallet associato all&apos;account (completa l&apos;onboarding
+                  OAuth).
+                </p>
+              )}
+            </div>
+            <p className="mt-6 text-xs font-medium uppercase tracking-wide text-slate-500">
               DID
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -309,6 +441,11 @@ export default function Dashboard() {
                 setCreateResult(null);
                 setAgentName("");
                 setAgentDescription("");
+                setProfile("readonly");
+                setCustomMaxPerTx(5);
+                setCustomMaxPerDay(20);
+                setNoPermitExpiry(true);
+                setExpiresAtLocal(defaultExpiresLocal());
                 setCreateOpen(true);
               }}
               className="rounded-xl bg-[#6ee7b7] px-5 py-2.5 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
@@ -336,6 +473,7 @@ export default function Dashboard() {
                   onOpenSnippet={() => openSnippetFor(agent)}
                   onOpenFund={() => setFundAddress(agent.walletAddress ?? null)}
                   onRevoke={() => revokeAgent(agent.agentDid)}
+                  onActivate={activateAgent}
                 />
               ))}
             </div>
@@ -347,26 +485,39 @@ export default function Dashboard() {
 
       {createOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-6"
           role="presentation"
-          onClick={() => !creating && createStep === "pick" && resetCreateDialog()}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="new-agent-title"
-            className="w-full max-w-md rounded-2xl border border-white/10 bg-[#12141c] p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="flex max-h-[min(92vh,900px)] w-full max-w-[44.8rem] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#12141c] shadow-2xl"
           >
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+              <h2
+                id="new-agent-title"
+                className={`text-lg font-semibold sm:text-xl ${
+                  createStep === "pick" ? "text-white" : "text-[#6ee7b7]"
+                }`}
+              >
+                {createStep === "pick"
+                  ? "Nuovo Agente"
+                  : "Agente creato con successo!"}
+              </h2>
+              <button
+                type="button"
+                aria-label="Chiudi"
+                onClick={() => resetCreateDialog()}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 text-lg leading-none text-slate-400 transition hover:bg-white/10 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 sm:py-6">
             {createStep === "pick" ? (
               <>
-                <h2
-                  id="new-agent-title"
-                  className="text-xl font-semibold text-white"
-                >
-                  Nuovo Agente
-                </h2>
-                <div className="mt-6 space-y-4">
+                <div className="space-y-4">
                   <div>
                     <label
                       htmlFor="agent-name"
@@ -404,33 +555,101 @@ export default function Dashboard() {
                 <p className="mt-6 text-xs font-medium uppercase tracking-wide text-slate-500">
                   Profilo permessi
                 </p>
-                <div className="mt-3 space-y-4">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {PROFILES.map((p) => (
                     <label
                       key={p.id}
-                      className={`flex cursor-pointer gap-3 rounded-xl border p-4 transition ${
+                      className={`flex cursor-pointer flex-col gap-2 rounded-xl border p-3 transition sm:min-h-[7.5rem] ${
                         profile === p.id
                           ? "border-[#6ee7b7]/60 bg-[#6ee7b7]/10"
                           : "border-white/10 bg-white/[0.02] hover:border-white/20"
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="perm"
-                        className="mt-1 accent-[#6ee7b7]"
-                        checked={profile === p.id}
-                        onChange={() => setProfile(p.id)}
-                      />
-                      <span>
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="radio"
+                          name="perm"
+                          className="mt-0.5 accent-[#6ee7b7]"
+                          checked={profile === p.id}
+                          onChange={() => setProfile(p.id)}
+                        />
                         <span className="font-medium text-white">{p.title}</span>
-                        <span className="mt-1 block text-sm text-slate-400">
-                          {p.description}
-                        </span>
+                      </div>
+                      <span className="block pl-6 text-sm leading-snug text-slate-400">
+                        {p.description}
                       </span>
                     </label>
                   ))}
                 </div>
-                <div className="mt-8 flex justify-end gap-3">
+                {profile === "custom" ? (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label
+                        htmlFor="custom-max-tx"
+                        className="block text-xs font-medium uppercase tracking-wide text-slate-500"
+                      >
+                        Max IOTA per transazione
+                      </label>
+                      <input
+                        id="custom-max-tx"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={customMaxPerTx}
+                        onChange={(e) => setCustomMaxPerTx(Number(e.target.value))}
+                        className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-2.5 text-sm text-[#e2e4ed] focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="custom-max-day"
+                        className="block text-xs font-medium uppercase tracking-wide text-slate-500"
+                      >
+                        Max IOTA al giorno
+                      </label>
+                      <input
+                        id="custom-max-day"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={customMaxPerDay}
+                        onChange={(e) => setCustomMaxPerDay(Number(e.target.value))}
+                        className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-2.5 text-sm text-[#e2e4ed] focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <div className="mt-6 space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                  <label className="flex cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="accent-[#6ee7b7]"
+                      checked={noPermitExpiry}
+                      onChange={(e) => setNoPermitExpiry(e.target.checked)}
+                    />
+                    <span className="text-sm text-slate-300">
+                      Nessuna scadenza del permit on-chain
+                    </span>
+                  </label>
+                  {!noPermitExpiry ? (
+                    <div>
+                      <label
+                        htmlFor="permit-expires"
+                        className="block text-xs font-medium uppercase tracking-wide text-slate-500"
+                      >
+                        Scadenza permit (locale)
+                      </label>
+                      <input
+                        id="permit-expires"
+                        type="datetime-local"
+                        value={expiresAtLocal}
+                        onChange={(e) => setExpiresAtLocal(e.target.value)}
+                        className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-2.5 text-sm text-[#e2e4ed] focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-6">
                   <button
                     type="button"
                     disabled={creating}
@@ -451,13 +670,7 @@ export default function Dashboard() {
               </>
             ) : createResult ? (
               <>
-                <h2
-                  id="new-agent-title"
-                  className="text-xl font-semibold text-[#6ee7b7]"
-                >
-                  Agente creato con successo!
-                </h2>
-                <div className="mt-6 space-y-3 text-sm text-slate-300">
+                <div className="space-y-3 text-sm text-slate-300">
                   <p>
                     <span className="text-slate-500">Nome</span>
                     <br />
@@ -487,13 +700,15 @@ export default function Dashboard() {
                   <p>
                     <span className="text-slate-500">Stato</span>
                     <br />
-                    In attesa di attivazione
+                    Non attivato — usa «Attiva Agente» sulla scheda quando sei
+                    pronto.
                   </p>
                   <p className="pt-2 text-slate-400">
-                    Il prossimo passo: collega questo agente al tuo workflow.
+                    Puoi già copiare lo snippet per preparare n8n; l’agente
+                    funzionerà dopo l’attivazione dalla dashboard.
                   </p>
                 </div>
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => resetCreateDialog()}
@@ -505,7 +720,7 @@ export default function Dashboard() {
                     type="button"
                     onClick={() => {
                       setSnippetAgentDid(createResult.agentDid);
-                      setSnippetStatus("pending_activation");
+                      setSnippetStatus("created");
                       setCreateOpen(false);
                       setCreateStep("pick");
                       setCreateResult(null);
@@ -517,6 +732,7 @@ export default function Dashboard() {
                 </div>
               </>
             ) : null}
+            </div>
           </div>
         </div>
       ) : null}

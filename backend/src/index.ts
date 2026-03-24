@@ -7,13 +7,14 @@ import passport from "passport";
 import { getAllowedFrontendOrigins } from "./allowedFrontendOrigins.js";
 import { ensureDbFile } from "./services/db.js";
 import { initMasterWallet, logMasterWalletStatus } from "./services/masterWallet.js";
-import { configureGoogleAuth } from "./routes/auth.js";
+import { configureOAuthStrategies } from "./routes/auth.js";
 import authRouter from "./routes/auth.js";
 import agentRouter from "./routes/agent.js";
 import didRouter from "./routes/did.js";
 import walletRouter from "./routes/wallet.js";
 import adminRouter from "./routes/admin.js";
 import bridgeRouter from "./routes/bridge.js";
+import shipmentsRouter from "./routes/shipments.js";
 import { requestLogMiddleware } from "./requestLog.js";
 
 const app = express();
@@ -42,7 +43,7 @@ app.use(passport.initialize());
 
 app.use(requestLogMiddleware);
 
-configureGoogleAuth();
+configureOAuthStrategies();
 
 app.use("/auth", authRouter);
 app.use("/agent", agentRouter);
@@ -50,6 +51,7 @@ app.use("/did", didRouter);
 app.use("/wallet", walletRouter);
 app.use("/admin", adminRouter);
 app.use("/bridge", bridgeRouter);
+app.use("/shipments", shipmentsRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Non trovato" });

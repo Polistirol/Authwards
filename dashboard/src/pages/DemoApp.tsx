@@ -1,6 +1,4 @@
-import { useState } from "react";
-
-import { LoginModal, useIotaAuth } from "../sdk";
+import { useIotaAuth } from "../sdk";
 
 const CODE_SNIPPET = `import { IotaAuthProvider, useIotaAuth } from "@iota-auth/sdk";
 
@@ -19,8 +17,7 @@ function MyDapp() {
 }`;
 
 export default function DemoApp() {
-  const { user, did, isAuthenticated, loading } = useIotaAuth();
-  const [modalOpen, setModalOpen] = useState(false);
+  const { user, did, isAuthenticated, loading, login } = useIotaAuth();
 
   return (
     <div className="min-h-screen bg-[#1e293b] text-slate-100">
@@ -45,7 +42,7 @@ export default function DemoApp() {
             </p>
             <button
               type="button"
-              onClick={() => setModalOpen(true)}
+              onClick={() => login()}
               className="mt-8 rounded-xl bg-[#60a5fa] px-8 py-3 font-semibold text-[#0f172a] shadow-[0_0_24px_rgba(96,165,250,0.35)] transition hover:bg-[#93c5fd]"
             >
               Accedi con IOTA Auth
@@ -77,14 +74,12 @@ export default function DemoApp() {
 
             {user ? (
               <p className="text-center text-sm text-slate-500">
-                Sessione attiva come {user.email}
+                Sessione attiva come {user.email ?? user.providerId}
               </p>
             ) : null}
           </div>
         )}
       </main>
-
-      <LoginModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
   );
 }

@@ -2,6 +2,8 @@ import type { PermissionProfile } from "./types/db.js";
 
 export const PROFILES = {
   readonly: { canTransact: false, maxPerTx: 0, maxPerDay: 0 },
+  /** Limiti effettivi vanno letti da db (permitMaxPerTxIota); qui solo fallback. */
+  custom: { canTransact: true, maxPerTx: 5, maxPerDay: 20 },
   low_value: { canTransact: true, maxPerTx: 5, maxPerDay: 20 },
   full_access: { canTransact: true, maxPerTx: Number.POSITIVE_INFINITY, maxPerDay: Number.POSITIVE_INFINITY },
 } as const;

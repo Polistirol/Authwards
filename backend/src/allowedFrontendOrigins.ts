@@ -15,14 +15,20 @@ export function getAllowedFrontendOrigins(): string[] {
   else if (single) list = [single];
 
   if (list.length === 0) {
-    return ["http://localhost:5173", "http://localhost:5174"].map(normalizeOrigin);
+    return ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"].map(
+      normalizeOrigin,
+    );
   }
 
   list = list.map(normalizeOrigin);
 
   const allLocalhost = list.every((o) => /localhost|127\.0\.0\.1/.test(o));
   const sdkConsole = normalizeOrigin("http://localhost:5174");
-  if (allLocalhost && !list.includes(sdkConsole)) list.push(sdkConsole);
+  const traceflowDemo = normalizeOrigin("http://localhost:5175");
+  if (allLocalhost) {
+    if (!list.includes(sdkConsole)) list.push(sdkConsole);
+    if (!list.includes(traceflowDemo)) list.push(traceflowDemo);
+  }
 
   return list;
 }

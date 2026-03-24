@@ -9,7 +9,7 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL as string;
 
 function App() {
   return (
-    <IotaAuthProvider backendUrl={backendUrl}>
+    <IotaAuthProvider backendUrl={backendUrl} telegramLoginEnabled>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
