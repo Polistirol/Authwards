@@ -16,7 +16,7 @@ function isAuthProviderType(v: unknown): v is AuthProviderType {
 
 function migrateUserRecord(raw: unknown): { user: DbUser; migrated: boolean } {
   if (!raw || typeof raw !== "object") {
-    throw new Error("Record utente non valido");
+    throw new Error("Invalid user record");
   }
   const o = { ...(raw as Record<string, unknown>) };
   let migrated = false;
@@ -27,7 +27,7 @@ function migrateUserRecord(raw: unknown): { user: DbUser; migrated: boolean } {
     migrated = true;
   }
   if (typeof o.providerId !== "string" || !o.providerId) {
-    throw new Error("Record utente senza providerId");
+    throw new Error("User record missing providerId");
   }
   if (!isAuthProviderType(o.providerType)) {
     o.providerType = "google";
@@ -55,7 +55,7 @@ function migrateUserRecord(raw: unknown): { user: DbUser; migrated: boolean } {
 
 function migrateAgentRecord(raw: unknown): { agent: DbAgent; migrated: boolean } {
   if (!raw || typeof raw !== "object") {
-    throw new Error("Record agente non valido");
+    throw new Error("Invalid agent record");
   }
   const o = { ...(raw as Record<string, unknown>) };
   let migrated = false;
@@ -66,7 +66,7 @@ function migrateAgentRecord(raw: unknown): { agent: DbAgent; migrated: boolean }
     migrated = true;
   }
   if (typeof o.ownerProviderId !== "string" || !o.ownerProviderId) {
-    throw new Error("Record agente senza ownerProviderId");
+    throw new Error("Agent record missing ownerProviderId");
   }
   if (!isAuthProviderType(o.ownerProviderType)) {
     o.ownerProviderType = "google";
@@ -129,12 +129,12 @@ async function readDbInitFromDisk(): Promise<DbShape | null> {
     const parsed = JSON.parse(raw) as unknown;
     return normalizeDb(parsed).shape;
   } catch (e) {
-    console.error("[db] Lettura db_init.json fallita:", e);
+    console.error("[db] Failed to read db_init.json:", e);
     return null;
   }
 }
 
-/** Aggiunge shipments da `init` che non esistono già (chiave `id`). Non tocca users/agents/agentLogs. */
+/** Appends shipments from `init` that are not already present (key `id`). Does not touch users/agents/agentLogs. */
 export function mergeShipmentsFromInit(current: DbShape, init: DbShape): { merged: DbShape; addedCount: number } {
   const seen = new Set(current.shipments.map((s) => s.id));
   const mergedShipments = [...current.shipments];
@@ -152,8 +152,8 @@ export function mergeShipmentsFromInit(current: DbShape, init: DbShape): { merge
 }
 
 /**
- * Legge `db_init.json` e unisce nel DB su disco solo shipments nuove (per `id`).
- * Utile dopo un deploy con nuovi record demo senza perdere utenti/agenti locali.
+ * Reads `db_init.json` and merges into the on-disk DB only new shipments (by `id`).
+ * Useful after a deploy with new demo records without losing local users/agents.
  */
 export async function mergeDbInitIntoExisting(): Promise<{ addedShipments: number; changed: boolean }> {
   const init = await readDbInitFromDisk();
@@ -214,7 +214,7 @@ export async function findUserByProvider(
   return db.users.find((u) => u.providerId === providerId && u.providerType === providerType);
 }
 
-/** @deprecated Usare findUserByProvider; solo compat lettura codice legacy. */
+/** @deprecated Use findUserByProvider; legacy read compatibility only. */
 export async function findUserByGoogleId(googleId: string): Promise<DbUser | undefined> {
   return findUserByProvider(googleId, "google");
 }
@@ -282,7 +282,7 @@ export async function updateUserByProvider(
   return true;
 }
 
-/** @deprecated Usare updateUserByProvider. */
+/** @deprecated Use updateUserByProvider. */
 export async function updateUserByGoogleId(googleId: string, patch: Partial<DbUser>): Promise<boolean> {
   return updateUserByProvider(googleId, "google", patch);
 }

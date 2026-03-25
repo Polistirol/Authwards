@@ -27,10 +27,10 @@ export type CreateAgentInput = {
   permissionProfile: string;
   name: string;
   description: string;
-  /** Obbligatori se permissionProfile è `custom` (IOTA interi >= 0). */
+  /** Required when permissionProfile is `custom` (whole IOTA >= 0). */
   customMaxPerTxIota?: number;
   customMaxPerDayIota?: number;
-  /** Timestamp ms Unix; 0 o omit = senza scadenza. */
+  /** Unix ms timestamp; 0 or omit = no expiry. */
   permitExpiresAtMs?: number | null;
   taskType?: string;
   taskConfig?: { shipmentId: string; action?: string };
@@ -39,14 +39,14 @@ export type CreateAgentInput = {
 export type UseAgentResult = {
   agents: Agent[];
   loading: boolean;
-  /** Ricarica la lista (es. dopo revoke). */
+  /** Reloads the list (e.g. after revoke). */
   refreshAgents: () => Promise<void>;
   createAgent: (input: CreateAgentInput) => Promise<CreateAgentResult | null>;
   agentLogs: Map<string, AgentLog[]>;
-  /** Carica log statici da GET /agent/logs/:agentDid (nessun WebSocket). */
+  /** Loads static logs from GET /agent/logs/:agentDid (no WebSocket). */
   fetchAgentLogs: (agentDid: string) => Promise<void>;
   revokeAgent: (agentDid: string) => Promise<boolean>;
-  /** Attiva l’agente dalla dashboard (POST /agent/:agentDid/activate). */
+  /** Activates the agent from the dashboard (POST /agent/:agentDid/activate). */
   activateAgent: (agentDid: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
@@ -218,7 +218,7 @@ export function useAgent(): UseAgentResult {
   const activateAgent = useCallback(
     async (agentDid: string): Promise<{ ok: boolean; error?: string }> => {
       if (!token) {
-        return { ok: false, error: "Non autenticato" };
+        return { ok: false, error: "Not authenticated" };
       }
       try {
         const res = await fetch(
@@ -240,7 +240,7 @@ export function useAgent(): UseAgentResult {
         await loadAgents(true);
         return { ok: true };
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Errore di rete";
+        const msg = e instanceof Error ? e.message : "Network error";
         return { ok: false, error: msg };
       }
     },

@@ -5,7 +5,7 @@ import type { DbAgent } from "../types/db.js";
 
 declare module "express-serve-static-core" {
   interface Request {
-    /** Riga agente da db (Agent Bridge). */
+    /** Agent row from DB (Agent Bridge). */
     agent?: DbAgent;
   }
 }
@@ -16,7 +16,7 @@ function extractBearer(header: string | undefined): string | null {
   return t || null;
 }
 
-/** Autentica tramite `Authorization: Bearer <agentToken>` cercando in db.json. */
+/** Authenticates via `Authorization: Bearer <agentToken>` by looking up db.json. */
 export async function requireAgentToken(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const token = extractBearer(req.headers.authorization);

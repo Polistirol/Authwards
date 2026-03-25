@@ -125,7 +125,7 @@ const char* WIFI_SSID = "YOUR_WIFI";
 const char* WIFI_PASS = "YOUR_PASSWORD";
 const char* PLATFORM_URL = "${platformUrl}";
 const char* AGENT_TOKEN = "${agentToken}";
-const int CHECK_INTERVAL = 30000; // 30 secondi
+const int CHECK_INTERVAL = 30000; // 30 seconds
 
 void setup() {
   Serial.begin(115200);
@@ -136,12 +136,12 @@ void setup() {
   }
   Serial.println("\\nConnected!");
   
-  // Attiva l'agente (una volta)
+  // Activate the agent (once)
   callBridge("/bridge/activate", "");
 }
 
 void loop() {
-  // Check condizione
+  // Check condition
   String checkResponse = callBridge("/bridge/check", "");
   
   DynamicJsonDocument doc(1024);
@@ -196,7 +196,7 @@ AGENT_NAME = ${pyName}
 AGENT_DID = ${pyDid}
 PLATFORM_URL = ${pyPlatform}
 AGENT_TOKEN = ${pyToken}
-CHECK_INTERVAL = 30  # secondi
+CHECK_INTERVAL = 30  # seconds
 
 HEADERS = {
     "Authorization": f"Bearer {AGENT_TOKEN}",
@@ -204,20 +204,20 @@ HEADERS = {
 }
 
 def activate():
-    """Attiva l'agente (una volta)"""
+    """Activate the agent (once)"""
     r = requests.post(f"{PLATFORM_URL}/bridge/activate", headers=HEADERS)
     print(f"[activate] {r.status_code}: {r.json()}")
     return r.json()
 
 def check():
-    """Controlla la condizione"""
+    """Check the condition"""
     r = requests.post(f"{PLATFORM_URL}/bridge/check", headers=HEADERS)
     data = r.json()
     print(f"[check] conditionMet: {data.get('conditionMet')}")
     return data
 
 def execute(action="release_payment"):
-    """Esegui l'azione"""
+    """Execute the action"""
     r = requests.post(
         f"{PLATFORM_URL}/bridge/execute",
         headers=HEADERS,
@@ -233,10 +233,10 @@ if __name__ == "__main__":
     print(f"Platform: {PLATFORM_URL}")
     print("---")
     
-    # Attiva
+    # Activate
     activate()
     
-    # Loop principale
+    # Main loop
     while True:
         try:
             result = check()
@@ -254,15 +254,15 @@ if __name__ == "__main__":
 PLATFORM_URL="${platformUrl}"
 AGENT_TOKEN="${agentToken}"
 
-# 1. Attiva l'agente (una volta)
+# 1. Activate the agent (once)
 curl -s -X POST "$PLATFORM_URL/bridge/activate" \\
   -H "Authorization: Bearer $AGENT_TOKEN" | jq .
 
-# 2. Controlla la condizione
+# 2. Check the condition
 curl -s -X POST "$PLATFORM_URL/bridge/check" \\
   -H "Authorization: Bearer $AGENT_TOKEN" | jq .
 
-# 3. Esegui l'azione
+# 3. Execute the action
 curl -s -X POST "$PLATFORM_URL/bridge/execute" \\
   -H "Authorization: Bearer $AGENT_TOKEN" \\
   -H "Content-Type: application/json" \\
@@ -276,7 +276,7 @@ curl -s -X POST "$PLATFORM_URL/bridge/execute" \\
 
 const PLATFORM_URL = '${escapeForJsString(platformUrl)}';
 const AGENT_TOKEN = '${escapeForJsString(agentToken)}';
-const CHECK_INTERVAL = 30000; // 30 secondi
+const CHECK_INTERVAL = 30000; // 30 seconds
 
 const headers = {
   'Authorization': \`Bearer \${AGENT_TOKEN}\`,
@@ -333,35 +333,35 @@ main();`;
     providers: {
       n8n: {
         label: "n8n Workflow",
-        description: "Importa questo file in n8n per avere il workflow pronto",
+        description: "Import this file into n8n to get a ready-made workflow",
         fileType: "json",
         fileName: `authward-agent-${safeName}.json`,
         content: n8nWorkflow,
       },
       arduino: {
         label: "Arduino / ESP32",
-        description: "Sketch C++ per microcontroller con WiFi",
+        description: "C++ sketch for microcontrollers with WiFi",
         fileType: "ino",
         fileName: "authward_agent.ino",
         content: arduinoContent,
       },
       python: {
         label: "Python Script",
-        description: "Script Python per bot, server, o Raspberry Pi",
+        description: "Python script for bots, servers, or Raspberry Pi",
         fileType: "py",
         fileName: "authward_agent.py",
         content: pythonContent,
       },
       curl: {
-        label: "cURL (generico)",
-        description: "Comandi shell per test o integrazione in qualsiasi linguaggio",
+        label: "cURL (generic)",
+        description: "Shell commands for testing or integration in any language",
         fileType: "sh",
         fileName: "authward_agent.sh",
         content: curlContent,
       },
       javascript: {
         label: "JavaScript / Node.js",
-        description: "Script Node.js o modulo per integrazione in qualsiasi progetto JS",
+        description: "Node.js script or module for integration into any JS project",
         fileType: "js",
         fileName: "authward_agent.js",
         content: jsContent,

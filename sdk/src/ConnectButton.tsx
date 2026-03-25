@@ -25,18 +25,18 @@ export type ConnectButtonProps = {
   label?: string;
   theme?: "dark" | "light";
   size?: "sm" | "md" | "lg";
-  /** URL dashboard / frontend (es. `FRONTEND_URL` / `VITE_FRONTEND_URL`). */
+  /** Dashboard / frontend URL (e.g. `FRONTEND_URL` / `VITE_FRONTEND_URL`). */
   dashboardUrl?: string;
   /**
-   * Stesso uso di `dashboardUrl` (preferito se imposti `FRONTEND_URL` in .env).
-   * In apertura viene aggiunto `?token=` (JWT) così la dashboard usa `IotaAuthProvider` già autenticata.
+   * Same as `dashboardUrl` (preferred if you set `FRONTEND_URL` in .env).
+   * On open, `?token=` (JWT) is appended so the dashboard uses an already-authenticated `IotaAuthProvider`.
    */
   frontendUrl?: string;
   showBalance?: boolean;
-  /** Dopo un login effettivo (non al ripristino sessione). */
+  /** After a real login (not when restoring session). */
   onConnect?: (user: User) => void;
   onDisconnect?: () => void;
-  /** Link “Powered by IOTA Auth” nel footer del menu. */
+  /** “Powered by IOTA Auth” link in the menu footer. */
   landingUrl?: string;
 };
 
@@ -73,7 +73,7 @@ function explorerWalletUrl(address: string): string {
   return `${IOTA_EXPLORER_ORIGIN}/address/${encodeURIComponent(address)}`;
 }
 
-/** Estrae l’identificativo oggetto `0x…` dal DID (senza `did:iota:…`). */
+/** Extracts the `0x…` object id from the DID (without `did:iota:…`). */
 function extractObjectHexFromDid(did: string): string | null {
   const m = did.match(/(0x[a-fA-F0-9]+)/);
   return m ? m[1] : null;
@@ -92,7 +92,7 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** Allinea al bootstrap di `IotaAuthProvider` (`?token=` → sessione sulla destinazione). */
+/** Matches `IotaAuthProvider` bootstrap (`?token=` → session on the target). */
 function appendSessionTokenToUrl(href: string, jwt: string | null): string {
   if (!jwt?.trim()) return href;
   try {
@@ -227,7 +227,7 @@ export function ConnectButton({
     };
   }, [theme]);
 
-  /* onConnect: solo transizione reale post-bootstrap */
+  /* onConnect: only real transition after bootstrap */
   useEffect(() => {
     if (authLoading) return;
     if (!authReady.current) {
@@ -417,7 +417,7 @@ export function ConnectButton({
   }
 
   const displayDid = did ? truncateDidShort(did) : "—";
-  const displayName = user?.name?.trim() || "Utente";
+  const displayName = user?.name?.trim() || "User";
 
   const dropdown = menuMounted ? (
     <div
@@ -520,7 +520,7 @@ export function ConnectButton({
                 padding: 0,
               }}
             >
-              {copyAddrFeedback ? "Copiato!" : "Copia"}
+              {copyAddrFeedback ? "Copied!" : "Copy"}
             </button>
           ) : null}
           {walletAddress ? (
@@ -537,7 +537,7 @@ export function ConnectButton({
                 alignItems: "center",
                 color: palette.muted,
               }}
-              aria-label="Apri indirizzo su IOTA Explorer"
+              aria-label="Open address on IOTA Explorer"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                 <path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
@@ -599,7 +599,7 @@ export function ConnectButton({
                     cursor: "pointer",
                   }}
                 >
-                  {copyDidFeedback ? "Copiato!" : "Copia"}
+                  {copyDidFeedback ? "Copied!" : "Copy"}
                 </button>
                 {didObjectHex ? (
                   <button
@@ -615,7 +615,7 @@ export function ConnectButton({
                       alignItems: "center",
                       color: palette.muted,
                     }}
-                    aria-label="Apri oggetto DID su IOTA Explorer"
+                    aria-label="Open DID object on IOTA Explorer"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                       <path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
@@ -663,7 +663,7 @@ export function ConnectButton({
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
                 </svg>
-                Manage identities
+                Manage delegated identities
               </span>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden style={{ flexShrink: 0, opacity: 0.75 }}>
                 <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />

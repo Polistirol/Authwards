@@ -12,7 +12,7 @@ function isVerboseHttpEnabled(): boolean {
   return v === "true" || v === "1" || v === "yes";
 }
 
-/** Path senza query (per confronti stabili). */
+/** Path without query string (stable comparisons). */
 function pathOnly(req: Request): string {
   const u = req.originalUrl ?? req.url ?? "/";
   const q = u.indexOf("?");
@@ -20,9 +20,9 @@ function pathOnly(req: Request): string {
 }
 
 /**
- * Logga richieste HTTP:
- * - Sempre: POST/PUT/PATCH/DELETE, risposte ≥400, GET OAuth `/auth/google*`, `/auth/github*`
- * - Solo se `LOG_HTTP_VERBOSE=true`: altri GET/HEAD
+ * Logs HTTP requests:
+ * - Always: POST/PUT/PATCH/DELETE, responses ≥400, OAuth GET `/auth/google*`, `/auth/github*`
+ * - Only when `LOG_HTTP_VERBOSE=true`: other GET/HEAD
  */
 export function requestLogMiddleware(req: Request, res: Response, next: NextFunction): void {
   res.on("finish", () => {

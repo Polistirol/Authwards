@@ -15,7 +15,7 @@ function mergeDbInitAuthOk(req: Request): boolean {
   return header === secret || bearer === secret;
 }
 
-/** Debug: stato master wallet e airdrop (nessun JWT). */
+/** Debug: master wallet and airdrop status (no JWT). */
 router.get("/master-status", async (_req, res) => {
   try {
     const nanos = await getMasterBalanceNanos();
@@ -27,19 +27,19 @@ router.get("/master-status", async (_req, res) => {
       airdropAmount: process.env.WELCOME_AIRDROP_AMOUNT ?? "0",
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore";
+    const msg = e instanceof Error ? e.message : "Error";
     res.status(500).json({ error: msg });
   }
 });
 
 /**
- * Unisce `db_init.json` nel `db.json` esistente: aggiunge solo shipments con `id` nuovi.
- * Opzionale: `MERGE_DB_INIT_SECRET` — allora header `X-Merge-DB-Init-Secret` o `Authorization: Bearer <secret>`.
+ * Merges `db_init.json` into existing `db.json`: only appends shipments with new `id` values.
+ * Optional: `MERGE_DB_INIT_SECRET` — then header `X-Merge-DB-Init-Secret` or `Authorization: Bearer <secret>`.
  */
 router.post("/merge-db-init", async (req, res) => {
   try {
     if (!mergeDbInitAuthOk(req)) {
-      res.status(401).json({ error: "Non autorizzato" });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
     const r = await mergeDbInitIntoExisting();
@@ -49,7 +49,7 @@ router.post("/merge-db-init", async (req, res) => {
       changed: r.changed,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore";
+    const msg = e instanceof Error ? e.message : "Error";
     res.status(500).json({ error: msg });
   }
 });

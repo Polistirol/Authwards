@@ -11,23 +11,23 @@ export type UseIotaAuthResult = {
   loading: boolean;
   token: string | null;
   /**
-   * Senza argomento apre il modal di login.
-   * Con provider avvia OAuth (google/github), wallet, o modal (telegram).
+   * With no argument, opens the login modal.
+   * With a provider, starts OAuth (google/github), wallet, or Telegram popup.
    */
   login: (provider?: AuthProviderType) => void;
-  /** @deprecated Usare login('github'). */
+  /** @deprecated Use login('github'). */
   loginGitHub: () => void;
-  /** Flusso challenge-response con estensione wallet IOTA. */
+  /** Challenge–response flow with the IOTA wallet extension. */
   connectWallet: () => Promise<void>;
   logout: () => void;
   backendUrl: string;
   isFirstLogin: boolean;
   recoveryPhrase: string | null;
   acknowledgeFirstLogin: () => void;
-  /** Salva JWT dopo login wallet/telegram in-page. */
+  /** Persists JWT after in-page wallet/Telegram login. */
   completeSession: (token: string, user: User) => void;
   telegramLoginEnabled?: boolean;
-  /** @deprecated Usare telegramLoginEnabled. */
+  /** @deprecated Use telegramLoginEnabled. */
   telegramBotUsername?: string;
   telegramPopupError: string | null;
   iotaWalletDownloadUrl: string;

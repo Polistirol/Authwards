@@ -6,19 +6,19 @@ let masterKeypair: Ed25519Keypair | null = null;
 
 function getNodeUrl(): string {
   const url = process.env.IOTA_NODE_URL;
-  if (!url) throw new Error("IOTA_NODE_URL non impostata");
+  if (!url) throw new Error("IOTA_NODE_URL not set");
   return url;
 }
 
 function parseHexSecret(hex: string): Uint8Array {
   const s = hex.trim().replace(/^0x/i, "");
   if (!/^[0-9a-fA-F]+$/.test(s) || s.length !== 64) {
-    throw new Error("MASTER_WALLET_PRIVATE_KEY deve essere 32 byte in hex (64 caratteri, opzionale prefisso 0x)");
+    throw new Error("MASTER_WALLET_PRIVATE_KEY must be 32 bytes hex (64 chars, optional 0x prefix)");
   }
   return new Uint8Array(Buffer.from(s, "hex"));
 }
 
-/** Carica e memorizza la keypair del master (mnemonic o chiave hex/bech32). Chiamare una volta all’avvio. */
+/** Loads and stores the master keypair (mnemonic or hex/bech32 key). Call once at startup. */
 export function initMasterWallet(): void {
   const pk = process.env.MASTER_WALLET_PRIVATE_KEY?.trim();
   const mnemonic =
@@ -39,7 +39,7 @@ export function initMasterWallet(): void {
     masterKeypair = Ed25519Keypair.deriveKeypair(mnemonic);
   } else {
     throw new Error(
-      "Configura MASTER_WALLET_PRIVATE_KEY (hex 32 byte) oppure MASTER_WALLET_SEED_PHRASE / MASTER_WALLET_MNEMONIC",
+      "Set MASTER_WALLET_PRIVATE_KEY (32-byte hex) or MASTER_WALLET_SEED_PHRASE / MASTER_WALLET_MNEMONIC",
     );
   }
 
@@ -47,13 +47,13 @@ export function initMasterWallet(): void {
   const envAddr = process.env.MASTER_WALLET_ADDRESS?.trim();
   if (envAddr && envAddr.toLowerCase() !== derived.toLowerCase()) {
     console.warn(
-      `[masterWallet] MASTER_WALLET_ADDRESS (${envAddr}) non coincide con l'indirizzo derivato dalla chiave (${derived}). Verifica il .env.`,
+      `[masterWallet] MASTER_WALLET_ADDRESS (${envAddr}) does not match the address derived from the key (${derived}). Check .env.`,
     );
   }
 }
 
 export function getMasterKeypair(): Ed25519Keypair {
-  if (!masterKeypair) throw new Error("Master wallet non inizializzato (initMasterWallet)");
+  if (!masterKeypair) throw new Error("Master wallet not initialized (initMasterWallet)");
   return masterKeypair;
 }
 
@@ -72,7 +72,7 @@ const TX_OPTS = {
   showBalanceChanges: true,
 } as const;
 
-/** Trasferimento di `amountNanos` dal wallet master verso `toAddress`. Ritorna il digest della tx. */
+/** Transfers `amountNanos` from the master wallet to `toAddress`. Returns the tx digest. */
 export async function transferFromMaster(toAddress: string, amountNanos: bigint): Promise<string> {
   const signer = getMasterKeypair();
   const client = new IotaClient({ url: getNodeUrl() });
@@ -94,6 +94,6 @@ export async function logMasterWalletStatus(): Promise<void> {
     const iota = Number(nanos) / 1e9;
     console.log(`[masterWallet] Master wallet loaded: ${addr} (balance: ${iota.toFixed(4)} IOTA / ${nanos} nanos)`);
   } catch (e) {
-    console.warn("[masterWallet] Impossibile leggere il saldo master:", e);
+    console.warn("[masterWallet] Could not read master balance:", e);
   }
 }

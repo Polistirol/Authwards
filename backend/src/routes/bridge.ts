@@ -23,7 +23,7 @@ const TX_OPTS = {
 
 function getNodeUrl(): string {
   const url = process.env.IOTA_NODE_URL;
-  if (!url) throw new Error("IOTA_NODE_URL non impostata");
+  if (!url) throw new Error("IOTA_NODE_URL not set");
   return url;
 }
 
@@ -64,7 +64,7 @@ router.post("/activate", requireAgentToken, async (req, res) => {
       message: "Please activate this agent from the dashboard first",
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore activate";
+    const msg = e instanceof Error ? e.message : "Activate error";
     res.status(500).json({ error: msg });
   }
 });
@@ -106,7 +106,7 @@ router.post("/check", requireAgentToken, async (req, res) => {
     }
     res.json({ conditionMet: false, data: { reason: "no_monitor_config" } });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore check";
+    const msg = e instanceof Error ? e.message : "Check error";
     res.status(500).json({ error: msg });
   }
 });
@@ -162,19 +162,19 @@ router.post("/execute", requireAgentToken, async (req, res) => {
         usedOnChainPermit = true;
       } else if (auth.networkError || auth.error === "permit_package_missing") {
         console.warn(
-          "[bridge/execute] On-chain permit non verificabile (rete o package non configurato), uso fallback db.json",
+          "[bridge/execute] On-chain permit not verifiable (network or package not configured), using db.json fallback",
         );
       } else {
         const err = auth.error;
         const msg =
           err === "permit_expired"
-            ? "Permit scaduto"
+            ? "Permit expired"
             : err === "permit_inactive"
-              ? "Permit revocato o inattivo"
+              ? "Permit revoked or inactive"
               : err === "tx_limit"
-                ? "Limite per transazione superato (on-chain)"
+                ? "Per-transaction limit exceeded (on-chain)"
                 : err === "daily_limit"
-                  ? "Limite giornaliero superato (on-chain)"
+                  ? "Daily limit exceeded (on-chain)"
                   : err;
         res.status(403).json({ error: err, message: msg });
         return;
@@ -259,7 +259,7 @@ router.post("/execute", requireAgentToken, async (req, res) => {
       remainingDailyBudget,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore execute";
+    const msg = e instanceof Error ? e.message : "Execute error";
     res.status(500).json({ error: msg });
   }
 });
@@ -304,7 +304,7 @@ router.get("/status", requireAgentToken, async (req, res) => {
             createdAt: onChain.createdAt,
           };
         } else {
-          console.warn("[bridge/status] getPermitInfo vuoto, fallback db.json");
+          console.warn("[bridge/status] getPermitInfo empty, db.json fallback");
           permissions = {
             maxPerTx: limits.maxPerTx.toString(),
             maxPerDay: limits.maxPerDay.toString(),
@@ -314,7 +314,7 @@ router.get("/status", requireAgentToken, async (req, res) => {
           };
         }
       } catch (e) {
-        console.warn("[bridge/status] Lettura permit on-chain fallita, fallback db.json:", e);
+        console.warn("[bridge/status] On-chain permit read failed, db.json fallback:", e);
         permissions = {
           maxPerTx: limits.maxPerTx.toString(),
           maxPerDay: limits.maxPerDay.toString(),
@@ -347,7 +347,7 @@ router.get("/status", requireAgentToken, async (req, res) => {
       permissions,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore status";
+    const msg = e instanceof Error ? e.message : "Status error";
     res.status(500).json({ error: msg });
   }
 });
@@ -357,7 +357,7 @@ router.post("/revoke", requireJwt, async (req, res) => {
     const jwtUser = req.user as JwtUserPayload;
     const agentDid = req.body?.agentDid;
     if (typeof agentDid !== "string" || !agentDid.trim()) {
-      res.status(400).json({ error: "Body richiede { agentDid: string }" });
+      res.status(400).json({ error: "Body requires { agentDid: string }" });
       return;
     }
     const a = await db.findAgentByDid(agentDid.trim());
@@ -366,21 +366,21 @@ router.post("/revoke", requireJwt, async (req, res) => {
       a.ownerProviderId !== jwtUser.providerId ||
       a.ownerProviderType !== jwtUser.providerType
     ) {
-      res.status(403).json({ error: "Agente non trovato o non autorizzato" });
+      res.status(403).json({ error: "Agent not found or not authorized" });
       return;
     }
     await db.updateAgentByDid(a.agentDid, { status: "revoked", active: false });
     if (a.permitObjectId) {
       const rev = await revokePermitOnChain(a.permitObjectId);
       if (rev.success && rev.txHash) {
-        console.log(`[bridge/revoke] AgentPermit revocato on-chain: ${rev.txHash}`);
+        console.log(`[bridge/revoke] AgentPermit revoked on-chain: ${rev.txHash}`);
       } else {
-        console.warn("[bridge/revoke] revoke_permit on-chain fallita:", rev.error ?? "unknown");
+        console.warn("[bridge/revoke] revoke_permit on-chain failed:", rev.error ?? "unknown");
       }
     }
     res.json({ status: "revoked" });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore revoke";
+    const msg = e instanceof Error ? e.message : "Revoke error";
     res.status(500).json({ error: msg });
   }
 });

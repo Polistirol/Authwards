@@ -54,17 +54,17 @@ function resolvePermitIotaLimits(
     if (!Number.isFinite(nTx) || !Number.isFinite(nDay) || nTx < 0 || nDay < 0) {
       return {
         ok: false,
-        error: "Per permissionProfile custom servono customMaxPerTxIota e customMaxPerDayIota (numeri >= 0)",
+        error: "For permissionProfile custom, customMaxPerTxIota and customMaxPerDayIota are required (numbers >= 0)",
       };
     }
     const maxTx = Math.floor(nTx);
     const maxDay = Math.floor(nDay);
     if (maxTx > 1_000_000_000 || maxDay > 1_000_000_000) {
-      return { ok: false, error: "Limiti custom fuori range (max 1e9 IOTA per campo)" };
+      return { ok: false, error: "Custom limits out of range (max 1e9 IOTA per field)" };
     }
     return { ok: true, maxPerTx: String(maxTx), maxPerDay: String(maxDay) };
   }
-  return { ok: false, error: "permissionProfile non valido" };
+  return { ok: false, error: "permissionProfile is invalid" };
 }
 
 function maskToken(t: string | undefined): string | undefined {
@@ -88,7 +88,7 @@ router.post("/create", requireJwt, async (req, res) => {
     if (!permissionProfile || !PROFILES.includes(permissionProfile)) {
       res.status(400).json({
         error:
-          'Body richiede { permissionProfile: "readonly" | "custom" | "full_access" | "low_value" }',
+          'Body requires { permissionProfile: "readonly" | "custom" | "full_access" | "low_value" }',
       });
       return;
     }
@@ -108,7 +108,7 @@ router.post("/create", requireJwt, async (req, res) => {
 
     if (taskType === "shipment_monitor" && !taskConfigBody?.shipmentId) {
       res.status(400).json({
-        error: "Per taskType shipment_monitor serve taskConfig.shipmentId",
+        error: "taskType shipment_monitor requires taskConfig.shipmentId",
       });
       return;
     }
@@ -121,14 +121,14 @@ router.post("/create", requireJwt, async (req, res) => {
       typeof rawDesc === "string" ? rawDesc.trim().slice(0, 2000) : "";
     if (!name) {
       res.status(400).json({
-        error: "Body richiede { name: string (non vuoto), description?: string }",
+        error: "Body requires { name: string (non-empty), description?: string }",
       });
       return;
     }
 
     const user = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
     if (!user?.walletAddress) {
-      res.status(400).json({ error: "walletAddress utente mancante: completa prima l’onboarding OAuth" });
+      res.status(400).json({ error: "Missing user walletAddress: complete OAuth onboarding first" });
       return;
     }
 
@@ -191,11 +191,11 @@ router.post("/create", requireJwt, async (req, res) => {
         permitObjectId = created.permitObjectId;
         await db.updateAgentByDid(agentDid, { permitObjectId });
         console.log(
-          `[agent/create] AgentPermit on-chain creato: ${permitObjectId} (tx ${created.txHash})`,
+          `[agent/create] AgentPermit on-chain created: ${permitObjectId} (tx ${created.txHash})`,
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error("[agent/create] Creazione AgentPermit on-chain fallita (fallback db.json):", msg);
+        console.error("[agent/create] On-chain AgentPermit creation failed (db.json fallback):", msg);
       }
     } else {
       console.log("AgentPermit contract not configured, skipping on-chain permit");
@@ -212,7 +212,7 @@ router.post("/create", requireJwt, async (req, res) => {
       permitExplorerUrl: permitObjectId ? permitExplorerUrl(permitObjectId) : null,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore creazione agente";
+    const msg = e instanceof Error ? e.message : "Agent creation error";
     res.status(500).json({ error: msg });
   }
 });
@@ -240,7 +240,7 @@ router.get("/list", requireJwt, async (req, res) => {
     });
     res.json(safe);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore lista agenti";
+    const msg = e instanceof Error ? e.message : "Agent list error";
     res.status(500).json({ error: msg });
   }
 });
@@ -251,7 +251,7 @@ router.post("/:agentDid/activate", requireJwt, async (req, res) => {
     const agentDid = decodeURIComponent(req.params.agentDid);
     const a = await db.findAgentByDid(agentDid);
     if (!a || a.ownerProviderId !== jwtUser.providerId || a.ownerProviderType !== jwtUser.providerType) {
-      res.status(403).json({ error: "Agente non trovato o non autorizzato" });
+      res.status(403).json({ error: "Agent not found or not authorized" });
       return;
     }
     const st = effectiveStatus(a);
@@ -273,7 +273,7 @@ router.post("/:agentDid/activate", requireJwt, async (req, res) => {
       if (!react.success) {
         console.warn("[agent/activate] reactivate_permit on-chain:", react.error ?? "unknown");
       } else if (react.txHash) {
-        console.log(`[agent/activate] AgentPermit reactivate_permit on-chain: ${react.txHash}`);
+        console.log(`[agent/activate] AgentPermit reactivate_permit on-chain tx: ${react.txHash}`);
       }
     }
 
@@ -292,7 +292,7 @@ router.post("/:agentDid/activate", requireJwt, async (req, res) => {
       message: "Agent activated successfully",
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore attivazione";
+    const msg = e instanceof Error ? e.message : "Activation error";
     res.status(500).json({ error: msg });
   }
 });
@@ -307,11 +307,11 @@ router.get("/:agentDid/snippet", requireJwt, async (req, res) => {
       agent.ownerProviderId !== jwtUser.providerId ||
       agent.ownerProviderType !== jwtUser.providerType
     ) {
-      res.status(403).json({ error: "Agente non trovato o non autorizzato" });
+      res.status(403).json({ error: "Agent not found or not authorized" });
       return;
     }
     if (!agent.agentToken) {
-      res.status(400).json({ error: "Agente legacy senza agentToken: crea un nuovo agente" });
+      res.status(400).json({ error: "Legacy agent without agentToken: create a new agent" });
       return;
     }
 
@@ -319,7 +319,7 @@ router.get("/:agentDid/snippet", requireJwt, async (req, res) => {
 
     res.json(buildAgentSnippetPayload(agent, platformUrl));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore snippet";
+    const msg = e instanceof Error ? e.message : "Snippet error";
     res.status(500).json({ error: msg });
   }
 });
@@ -338,14 +338,14 @@ router.get("/logs/:agentDid", requireJwt, async (req, res) => {
       agent.ownerProviderId !== jwtUser.providerId ||
       agent.ownerProviderType !== jwtUser.providerType
     ) {
-      res.status(403).json({ error: "Agente non trovato o non autorizzato" });
+      res.status(403).json({ error: "Agent not found or not authorized" });
       return;
     }
 
     const logs = await db.getAgentLogs(agentDid, limit);
     res.json(logs);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore log agente";
+    const msg = e instanceof Error ? e.message : "Agent log error";
     res.status(500).json({ error: msg });
   }
 });

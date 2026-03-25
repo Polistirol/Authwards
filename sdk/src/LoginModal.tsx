@@ -249,10 +249,10 @@ export function LoginModal({
         aria-labelledby="iota-auth-login-title"
       >
         <h2 id="iota-auth-login-title" style={titleStyle}>
-          Accedi a IOTA
+          Sign in to IOTA
         </h2>
         <p style={subtitleStyle}>
-          Scegli come accedere. La tua identità decentralizzata viene creata automaticamente.
+          Choose how to sign in. Your decentralized identity is created automatically.
         </p>
 
         <button type="button" style={googleButtonStyle} onClick={handleGoogle}>
@@ -278,7 +278,7 @@ export function LoginModal({
 
         <div style={separatorWrap}>
           <div style={separatorLine} />
-          <span style={{ fontSize: "0.75rem", color: "#71717a", textTransform: "lowercase" }}>oppure</span>
+          <span style={{ fontSize: "0.75rem", color: "#71717a", textTransform: "lowercase" }}>or</span>
           <div style={separatorLine} />
         </div>
 
@@ -289,22 +289,22 @@ export function LoginModal({
           disabled={walletBusy}
         >
           <WalletGlyph />
-          <span>{walletBusy ? "Connessione…" : "Connect IOTA Wallet"}</span>
+          <span>{walletBusy ? "Connecting…" : "Connect IOTA Wallet"}</span>
         </button>
         {walletErr === "WALLET_MISSING" ? (
           <p style={{ marginTop: 10, fontSize: "0.82rem", lineHeight: 1.45, color: "#a1a1aa" }}>
-            Wallet IOTA non trovato.{" "}
+            IOTA wallet not found.{" "}
             <a href={iotaWalletDownloadUrl} target="_blank" rel="noreferrer" style={{ color: "#6ee7b7" }}>
-              Installa il wallet IOTA
+              Install the IOTA wallet
             </a>{" "}
-            per continuare.
+            to continue.
           </p>
         ) : walletErr ? (
           <p style={{ marginTop: 10, fontSize: "0.82rem", color: "#f87171" }}>{walletErr}</p>
         ) : null}
 
         <p style={footnoteStyle}>
-          Il tuo wallet e la tua identità sono tuoi. Puoi usarli su qualsiasi dApp IOTA.
+          Your wallet and your identity are yours. You can use them on any IOTA dApp.
         </p>
       </div>
     </div>

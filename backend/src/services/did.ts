@@ -50,13 +50,13 @@ function ensureWasm() {
 
 function getNodeUrl(): string {
   const url = process.env.IOTA_NODE_URL;
-  if (!url) throw new Error("IOTA_NODE_URL non impostata");
+  if (!url) throw new Error("IOTA_NODE_URL not set");
   return url;
 }
 
 function getFaucetHostFromEnv(): string {
   const url = process.env.IOTA_FAUCET_URL;
-  if (!url) throw new Error("IOTA_FAUCET_URL non impostata");
+  if (!url) throw new Error("IOTA_FAUCET_URL not set");
   return url;
 }
 
@@ -66,7 +66,7 @@ async function waitForNonZeroBalance(client: IotaClient, owner: string, attempts
     if (BigInt(totalBalance) > 0n) return;
     await new Promise((r) => setTimeout(r, 2000));
   }
-  throw new Error(`Saldo ancora zero per ${owner} dopo il faucet`);
+  throw new Error(`Balance still zero for ${owner} after faucet`);
 }
 
 async function fundAddress(client: IotaClient, address: string) {
@@ -93,7 +93,7 @@ export function iotaEd25519KeypairToIdentityJwk(keypair: Ed25519Keypair): Jwk {
 export function ed25519PrivateKeyToJwk(privateKey: KeyObject): Jwk {
   const j = privateKey.export({ format: "jwk" }) as JsonWebKey;
   if (j.kty !== "OKP" || j.crv !== "Ed25519" || !j.x || !j.d) {
-    throw new Error("Atteso JWK Ed25519 (OKP) con campi x e d");
+    throw new Error("Expected Ed25519 JWK (OKP) with x and d fields");
   }
   return new Jwk({
     kty: JwkType.Okp,
@@ -112,14 +112,14 @@ async function attachExternalEd25519Method(
 ) {
   const keyId = await storage.keyStorage().insert(privateJwk);
   const publicJwk = privateJwk.toPublic();
-  if (!publicJwk) throw new Error("toPublic() fallito dopo insert JWK");
+  if (!publicJwk) throw new Error("toPublic() failed after JWK insert");
   publicJwk.setKid(keyId);
   const vm = VerificationMethod.newFromJwk(doc.id(), publicJwk, fragment);
   doc.insertMethod(vm, MethodScope.VerificationMethod());
   await storage.keyIdStorage().insertKeyId(new MethodDigest(vm), keyId);
 }
 
-/** VM solo con chiave pubblica (login wallet: nessuna chiave privata lato server). */
+/** VM with public key only (wallet login: no private key on server). */
 async function attachPublicOnlyEd25519Method(
   storage: Storage,
   doc: IotaDocument,
@@ -142,7 +142,7 @@ async function createIdentityClientFromKeypair(
   if (options.fundFromFaucet) {
     await fundAddress(iotaClient, userAddress);
   }
-  // @iota/iota-interaction-ts tipizza il client come build CJS; qui forziamo compatibilità runtime.
+  // @iota/iota-interaction-ts types the client as CJS build; force runtime compatibility here.
   const readOnly = await IdentityClientReadOnly.create(iotaClient as never);
   const txSigner = new Ed25519KeypairSigner(payerKeypair as never);
   return IdentityClient.create(readOnly, txSigner);
@@ -160,10 +160,10 @@ async function getChainId(client: IotaClient): Promise<string> {
 }
 
 /**
- * Crea un DID su IOTA. Il parametro `publicKey` è l’`Ed25519Keypair` dell’SDK IOTA (chiave completa):
- * la parte pubblica entra nel DID Document; la parte privata serve solo in memoria per firmare `createIdentity`.
- * Gas: **wallet master** firma ed esegue la tx (`IdentityClient` = master). Il DID document contiene la VM dell’utente.
- * (Le tx `withSender`+`withGasOwner` richiedono 2 firme; `buildAndExecute` ne fornisce una → non usate.)
+ * Creates a DID on IOTA. `publicKey` is the IOTA SDK `Ed25519Keypair` (full key):
+ * public material goes into the DID document; private material is only in memory to sign `createIdentity`.
+ * Gas: **master wallet** signs and executes the tx (`IdentityClient` = master). The DID document contains the user's VM.
+ * (`withSender`+`withGasOwner` txs need two signatures; `buildAndExecute` provides one — not used here.)
  */
 export async function createDid(
   publicKey: Ed25519Keypair,
@@ -195,7 +195,7 @@ export async function createDid(
   await attachExternalEd25519Method(storage, unpublished, privateJwk, "#key-1");
 
   console.log(
-    "[did] Creazione DID utente: gas mode = master_payer (opzione C: firma+gas dal master, VM = chiave utente)",
+    "[did] User DID creation: gas mode = master_payer (option C: sign+gas from master, VM = user key)",
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txb: any = identityClient.createIdentity(unpublished).finish();
@@ -218,8 +218,8 @@ export async function createDid(
 }
 
 /**
- * DID per utente che ha solo il wallet estensione: la VM usa la chiave pubblica Ed25519
- * verificata dalla firma (nessun seed sul backend).
+ * DID for users with only the browser extension wallet: VM uses the Ed25519 public key
+ * verified from the signature (no seed on the backend).
  */
 export async function createDidForWalletOwner(publicKey: PublicKey): Promise<{
   did: string;
@@ -248,7 +248,7 @@ export async function createDidForWalletOwner(publicKey: PublicKey): Promise<{
   await attachPublicOnlyEd25519Method(storage, unpublished, publicJwk, "#key-1");
 
   console.log(
-    "[did] Creazione DID wallet login: gas mode = master_payer, VM = chiave pubblica wallet (senza private key sul server)",
+    "[did] Wallet-login DID creation: gas mode = master_payer, VM = wallet public key (no private key on server)",
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txb: any = identityClient.createIdentity(unpublished).finish();
@@ -267,7 +267,7 @@ export async function createDidForWalletOwner(publicKey: PublicKey): Promise<{
   };
 }
 
-/** Agente: VM agente + controller utente; firma e gas dal master (opzione C). */
+/** Agent: agent VM + user controller; signing and gas from master (option C). */
 export async function createAgentDid(params: {
   agentKeypair: Ed25519Keypair;
   ownerDid: string;
@@ -290,7 +290,7 @@ export async function createAgentDid(params: {
   await attachExternalEd25519Method(storage, unpublished, agentJwk, "#key-1");
 
   console.log(
-    "[did] Creazione DID agente: gas mode = master_payer (opzione C: firma+gas dal master, VM = chiave agente)",
+    "[did] Agent DID creation: gas mode = master_payer (option C: sign+gas from master, VM = agent key)",
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txb: any = identityClient.createIdentity(unpublished).finish();
@@ -316,9 +316,9 @@ export async function resolveDid(did: string): Promise<Record<string, unknown>> 
   return doc.toJSON() as Record<string, unknown>;
 }
 
-/** Seed Ed25519 32 byte da `KeyObject` (JWK `d`). */
+/** 32-byte Ed25519 seed from `KeyObject` (JWK `d`). */
 export function ed25519SeedFromPrivateKey(privateKey: KeyObject): Uint8Array {
   const j = privateKey.export({ format: "jwk" }) as JsonWebKey;
-  if (!j.d) throw new Error("JWK senza `d`");
+  if (!j.d) throw new Error("JWK missing `d`");
   return new Uint8Array(Buffer.from(j.d, "base64url"));
 }

@@ -15,9 +15,9 @@ export type IotaAuthContextValue = {
   completeSession: (token: string, user: User) => void;
   logout: () => void;
   acknowledgeFirstLogin: () => void;
-  /** Se true, mostra "Sign in with Telegram" senza widget in-page (popup verso il backend). */
+  /** If true, shows "Sign in with Telegram" without in-page widget (popup to backend). */
   telegramLoginEnabled?: boolean;
-  /** @deprecated Usare telegramLoginEnabled. Se telegramLoginEnabled è omesso, il bottone Telegram è visibile solo se valorizzato. */
+  /** @deprecated Use telegramLoginEnabled. If omitted, the Telegram button is visible only when this is set. */
   telegramBotUsername?: string;
   telegramPopupError: string | null;
   iotaWalletDownloadUrl: string;

@@ -25,14 +25,14 @@ const DEFAULT_WALLET_DOWNLOAD = "https://wiki.iota.org/get-started/introduction/
 export type IotaAuthProviderProps = {
   backendUrl: string;
   children: ReactNode;
-  /** Mostra "Sign in with Telegram" (popup → backend). Se omesso, resta visibile solo con `telegramBotUsername` (legacy). */
+  /** Shows "Sign in with Telegram" (popup → backend). If omitted, visible only when `telegramBotUsername` is set (legacy). */
   telegramLoginEnabled?: boolean;
-  /** @deprecated Solo per compatibilità: se `telegramLoginEnabled` è omesso, il bottone Telegram compare se valorizzato. */
+  /** @deprecated Compatibility only: if `telegramLoginEnabled` is omitted, the Telegram button appears when this is set. */
   telegramBotUsername?: string;
   iotaWalletDownloadUrl?: string;
   /**
-   * Se true (default), al primo login OAuth mostra il modal con seed phrase / DID / wallet.
-   * Disattivalo per white-label o se gestisci tu la UI (restano disponibili `recoveryPhrase` / `isFirstLogin` dal context).
+   * If true (default), first OAuth login shows the modal with seed phrase / DID / wallet.
+   * Turn off for white-label or if you build your own UI (`recoveryPhrase` / `isFirstLogin` remain on context).
    */
   showWelcomeModal?: boolean;
 };
@@ -113,7 +113,7 @@ export function IotaAuthProvider({
     );
     if (!popup) {
       setTelegramPopupError(
-        "Popup bloccata dal browser. Consenti le finestre a comparsa per questo sito.",
+        "Popup blocked by the browser. Allow pop-ups for this site.",
       );
       return;
     }
@@ -131,14 +131,14 @@ export function IotaAuthProvider({
           if (me) {
             completeSession(jwt, me);
           } else {
-            setTelegramPopupError("Sessione non valida dopo il login Telegram.");
+            setTelegramPopupError("Invalid session after Telegram login.");
           }
         })();
       } else if (rec.type === "iota-auth-error") {
         window.removeEventListener("message", onMessage);
         telegramMessageListenerRef.current = null;
         setTelegramPopupError(
-          typeof rec.error === "string" ? rec.error : "Errore durante il login Telegram.",
+          typeof rec.error === "string" ? rec.error : "Telegram login error.",
         );
       }
     };

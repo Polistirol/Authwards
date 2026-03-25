@@ -10,7 +10,7 @@ router.get("/", requireJwt, async (_req, res) => {
     const data = await db.readDb();
     res.json(data.shipments);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore";
+    const msg = e instanceof Error ? e.message : "Error";
     res.status(500).json({ error: msg });
   }
 });
@@ -19,12 +19,12 @@ router.get("/:id", requireJwt, async (req, res) => {
   try {
     const s = await db.findShipmentById(req.params.id);
     if (!s) {
-      res.status(404).json({ error: "Non trovato" });
+      res.status(404).json({ error: "Not found" });
       return;
     }
     res.json(s);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore";
+    const msg = e instanceof Error ? e.message : "Error";
     res.status(500).json({ error: msg });
   }
 });
@@ -33,18 +33,18 @@ router.patch("/:id", requireJwt, async (req, res) => {
   try {
     const status = req.body?.status;
     if (typeof status !== "string" || !status.trim()) {
-      res.status(400).json({ error: 'Body richiede { status: string }' });
+      res.status(400).json({ error: "Body requires { status: string }" });
       return;
     }
     const ok = await db.updateShipmentById(req.params.id, { status: status.trim() });
     if (!ok) {
-      res.status(404).json({ error: "Non trovato" });
+      res.status(404).json({ error: "Not found" });
       return;
     }
     const s = await db.findShipmentById(req.params.id);
     res.json(s);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore";
+    const msg = e instanceof Error ? e.message : "Error";
     res.status(500).json({ error: msg });
   }
 });

@@ -201,15 +201,15 @@ export function WelcomeModal(): ReactElement | null {
               color: "#ffffff",
             }}
           >
-            Benvenuto su IOTA
+            Welcome to IOTA
           </h1>
           <p id="iota-auth-welcome-desc" style={{ marginTop: 8, fontSize: 14, color: "#94a3b8" }}>
-            La tua identità decentralizzata è stata creata
+            Your decentralized identity has been created
           </p>
         </header>
 
         <section style={sectionBox}>
-          <p style={labelMuted}>Il tuo DID</p>
+          <p style={labelMuted}>Your DID</p>
           <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
             <code style={{ wordBreak: "break-all", fontSize: 14, color: ACCENT, fontFamily: "ui-monospace, monospace" }}>
               {did ? truncateMiddle(did) : "—"}
@@ -224,11 +224,11 @@ export function WelcomeModal(): ReactElement | null {
                 cursor: did ? "pointer" : "not-allowed",
               }}
             >
-              {copyDidOk ? "Copiato ✓" : "Copia"}
+              {copyDidOk ? "Copied ✓" : "Copy"}
             </button>
           </div>
 
-          <p style={{ ...labelMuted, marginTop: 20 }}>Il tuo Wallet</p>
+          <p style={{ ...labelMuted, marginTop: 20 }}>Your wallet</p>
           <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
             <code style={{ wordBreak: "break-all", fontSize: 14, color: ACCENT, fontFamily: "ui-monospace, monospace" }}>
               {walletAddress ? truncateMiddle(walletAddress) : "—"}
@@ -243,12 +243,12 @@ export function WelcomeModal(): ReactElement | null {
                 cursor: walletAddress ? "pointer" : "not-allowed",
               }}
             >
-              {copyWalletOk ? "Copiato ✓" : "Copia"}
+              {copyWalletOk ? "Copied ✓" : "Copy"}
             </button>
           </div>
 
           <p style={{ marginTop: 16, marginBottom: 0, fontSize: 12, lineHeight: 1.55, color: "#64748b" }}>
-            Questi sono tuoi. Puoi usarli su qualsiasi dApp IOTA, anche al di fuori di questo servizio.
+            These are yours. You can use them on any IOTA dApp, including outside this app.
           </p>
         </section>
 
@@ -261,7 +261,7 @@ export function WelcomeModal(): ReactElement | null {
             borderLeftColor: "#fbbf24",
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#ffffff" }}>La tua chiave di recupero</h2>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#ffffff" }}>Your recovery phrase</h2>
 
           <div
             style={{
@@ -277,8 +277,8 @@ export function WelcomeModal(): ReactElement | null {
               ⚠
             </span>
             <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#cbd5e1" }}>
-              Questa è l&apos;unica volta che vedrai questa chiave. Salvala in un luogo sicuro. Con questa chiave puoi
-              importare il tuo wallet nel wallet ufficiale IOTA e usarlo ovunque.
+              This is the only time you will see this phrase. Store it somewhere safe. With it you can
+              import your wallet into the official IOTA wallet and use it anywhere.
             </p>
           </div>
 
@@ -310,8 +310,8 @@ export function WelcomeModal(): ReactElement | null {
                 color: "#e2e4ed",
                 cursor: "pointer",
               }}
-              title={revealed ? "Nascondi" : "Mostra"}
-              aria-label={revealed ? "Nascondi chiave" : "Mostra chiave"}
+              title={revealed ? "Hide" : "Show"}
+              aria-label={revealed ? "Hide phrase" : "Show phrase"}
             >
               👁
             </button>
@@ -333,7 +333,7 @@ export function WelcomeModal(): ReactElement | null {
               cursor: "pointer",
             }}
           >
-            {copyPhraseOk ? "Copiata ✓" : "Copia"}
+            {copyPhraseOk ? "Copied ✓" : "Copy"}
           </button>
         </section>
 
@@ -351,7 +351,7 @@ export function WelcomeModal(): ReactElement | null {
                 accentColor: ACCENT,
               }}
             />
-            <span>Ho salvato la mia chiave di recupero in un luogo sicuro</span>
+            <span>I have saved my recovery phrase somewhere safe</span>
           </label>
 
           <button
@@ -371,7 +371,7 @@ export function WelcomeModal(): ReactElement | null {
               cursor: savedConfirm ? "pointer" : "not-allowed",
             }}
           >
-            Inizia a usare IOTA
+            Start using IOTA
           </button>
         </footer>
       </div>

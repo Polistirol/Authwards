@@ -22,7 +22,7 @@ function getPermissionLimitsLegacy(profile: PermissionProfile): {
   }
 }
 
-/** Limiti in nanos (fallback; AgentPermit on-chain quando disponibile). */
+/** Limits in nanos (fallback; on-chain AgentPermit when available). */
 export function getPermissionLimits(
   agentOrProfile: LimitFields | PermissionProfile,
 ): {

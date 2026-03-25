@@ -1,6 +1,6 @@
 /**
- * Connessione al wallet IOTA: Wallet Standard (@wallet-standard/app + iota:signPersonalMessage)
- * con fallback agli oggetti globali legacy (window.iota, …).
+ * IOTA wallet connection: Wallet Standard (@wallet-standard/app + iota:signPersonalMessage)
+ * with fallback to legacy global objects (window.iota, …).
  */
 
 import { getWallets } from "@wallet-standard/app";
@@ -10,7 +10,7 @@ import type { Wallet } from "@wallet-standard/base";
 
 export type IotaWalletAdapter = {
   connect?: () => Promise<void>;
-  /** Alcuni wallet espongono accounts sincroni dopo connect. */
+  /** Some wallets expose accounts synchronously after connect. */
   accounts?: readonly { address: string }[];
   getAccounts?: () => Promise<{ address: string }[]>;
   signPersonalMessage?: (input: { message: Uint8Array }) => Promise<{ signature: string } | string>;
@@ -91,7 +91,7 @@ function pickStandardWallet(): Wallet | null {
 }
 
 /**
- * Rileva subito wallet legacy o già registrato sul Wallet Standard (senza attesa).
+ * Immediately detects a legacy wallet or one already registered on Wallet Standard (no wait).
  */
 export function detectIotaWallet(): IotaWalletAdapter | null {
   const legacy = detectLegacyIotaWallet();
@@ -101,8 +101,8 @@ export function detectIotaWallet(): IotaWalletAdapter | null {
 }
 
 /**
- * Come {@link detectIotaWallet}, ma se l'estensione non si è ancora registrata aspetta l'evento
- * `register` (utile su cold load / Opera / timing stretti).
+ * Like {@link detectIotaWallet}, but if the extension has not registered yet, waits for the
+ * `register` event (useful on cold load / Opera / tight timing).
  */
 export async function resolveIotaWalletAdapter(timeoutMs = 8000): Promise<IotaWalletAdapter | null> {
   const immediate = detectIotaWallet();

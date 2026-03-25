@@ -16,11 +16,11 @@ const TX_OPTS = {
 
 function getNodeUrl(): string {
   const url = process.env.IOTA_NODE_URL;
-  if (!url) throw new Error("IOTA_NODE_URL non impostata");
+  if (!url) throw new Error("IOTA_NODE_URL not set");
   return url;
 }
 
-/** Saldo IOTA (nanos) per indirizzo; pubblico. */
+/** IOTA balance (nanos) for an address; public. */
 router.get("/balance/:address", async (req, res) => {
   try {
     const address = decodeURIComponent(req.params.address);
@@ -34,14 +34,14 @@ router.get("/balance/:address", async (req, res) => {
       nanos,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore lettura saldo";
+    const msg = e instanceof Error ? e.message : "Balance read error";
     res.status(502).json({ error: msg });
   }
 });
 
 /**
- * Trasferimento IOTA dall’indirizzo dell’utente (keypair cifrata nel DB) verso `to`.
- * Body: { to: string, amount: number } — `amount` in **nanos** (unità minima).
+ * Transfers IOTA from the user's address (encrypted keypair in DB) to `to`.
+ * Body: { to: string, amount: number } — `amount` in **nanos** (smallest unit).
  */
 router.post("/transfer", requireJwt, async (req, res) => {
   try {
@@ -49,7 +49,7 @@ router.post("/transfer", requireJwt, async (req, res) => {
     const to = req.body?.to;
     const amountRaw = req.body?.amount;
     if (typeof to !== "string" || !to.trim()) {
-      res.status(400).json({ error: "Body richiede { to: string, amount: number }" });
+      res.status(400).json({ error: "Body requires { to: string, amount: number }" });
       return;
     }
     const amountNum =
@@ -59,14 +59,14 @@ router.post("/transfer", requireJwt, async (req, res) => {
           ? parseInt(amountRaw, 10)
           : NaN;
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
-      res.status(400).json({ error: "amount deve essere un intero positivo (nanos)" });
+      res.status(400).json({ error: "amount must be a positive integer (nanos)" });
       return;
     }
     const amountNanos = BigInt(Math.floor(amountNum));
 
     const user = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
     if (!user?.encryptedPrivateKey || !user.iv || !user.salt) {
-      res.status(400).json({ error: "Wallet utente non disponibile (login precedente o dati mancanti)" });
+      res.status(400).json({ error: "User wallet unavailable (complete login first or data missing)" });
       return;
     }
 
@@ -92,7 +92,7 @@ router.post("/transfer", requireJwt, async (req, res) => {
       amount: amountNum,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore trasferimento";
+    const msg = e instanceof Error ? e.message : "Transfer error";
     res.status(500).json({ error: msg });
   }
 });

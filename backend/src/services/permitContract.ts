@@ -23,7 +23,7 @@ const TX_OPTS = {
 
 function getNodeUrl(): string {
   const url = process.env.IOTA_NODE_URL;
-  if (!url) throw new Error("IOTA_NODE_URL non impostata");
+  if (!url) throw new Error("IOTA_NODE_URL not set");
   return url;
 }
 
@@ -36,7 +36,7 @@ export function isPermitContractConfigured(): boolean {
   return Boolean(getAgentPermitPackageId());
 }
 
-/** Limiti on-chain in IOTA interi (convertiti in nanos in `create_permit`). */
+/** On-chain limits in whole IOTA (converted to nanos in `create_permit`). */
 export function permissionProfileToOnChainIotaLimits(profile: PermissionProfile): {
   maxPerTxIota: bigint;
   maxPerDayIota: bigint;
@@ -65,7 +65,7 @@ function utf8Bytes(s: string): number[] {
 
 function parseAbortCodeFromExecutionError(err: string | undefined): number | null {
   if (!err) return null;
-  // Esempi RPC: "... MoveAbort ... in command 0, MoveAbort ... code: 2" o simile
+  // Example RPC: "... MoveAbort ... in command 0, MoveAbort ... code: 2" etc.
   const m = /code[:\s]+(\d+)/i.exec(err);
   if (m) return parseInt(m[1], 10);
   const m2 = /abort[^0-9]*(\d+)/i.exec(err);
@@ -118,7 +118,7 @@ export async function createPermitOnChain(params: CreatePermitParams): Promise<{
   txHash: string;
 }> {
   const packageId = getAgentPermitPackageId();
-  if (!packageId) throw new Error("AGENT_PERMIT_PACKAGE_ID non configurato");
+  if (!packageId) throw new Error("AGENT_PERMIT_PACKAGE_ID not set");
 
   const client = new IotaClient({ url: getNodeUrl() });
   const signer = getMasterKeypair();
@@ -151,7 +151,7 @@ export async function createPermitOnChain(params: CreatePermitParams): Promise<{
 
   const permitObjectId = extractPermitIdFromEvents(packageId, result.events ?? null);
   if (!permitObjectId) {
-    throw new Error("PermitCreated event non trovato nella risposta transazione");
+    throw new Error("PermitCreated event not found in transaction response");
   }
 
   return { permitObjectId, txHash: digest };
@@ -161,7 +161,7 @@ export type AuthorizeSpendResult =
   | { success: true; txHash: string }
   | { success: false; error: string; txHash?: string; networkError?: boolean };
 
-/** `amountNanos` come nel contratto (stessa unità della transazione agente). */
+/** `amountNanos` as in the contract (same unit as the agent transaction). */
 export async function authorizeSpendOnChain(
   permitObjectId: string,
   amountNanos: bigint,
@@ -210,7 +210,7 @@ export async function reactivatePermitOnChain(permitObjectId: string): Promise<{
 }> {
   const packageId = getAgentPermitPackageId();
   if (!packageId) {
-    return { success: false, error: "AGENT_PERMIT_PACKAGE_ID non configurato" };
+    return { success: false, error: "AGENT_PERMIT_PACKAGE_ID not set" };
   }
 
   try {
@@ -251,7 +251,7 @@ export async function revokePermitOnChain(permitObjectId: string): Promise<{
 }> {
   const packageId = getAgentPermitPackageId();
   if (!packageId) {
-    return { success: false, error: "AGENT_PERMIT_PACKAGE_ID non configurato" };
+    return { success: false, error: "AGENT_PERMIT_PACKAGE_ID not set" };
   }
 
   try {

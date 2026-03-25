@@ -54,11 +54,11 @@ app.use("/bridge", bridgeRouter);
 app.use("/shipments", shipmentsRouter);
 
 app.use((req, res) => {
-  res.status(404).json({ error: "Non trovato" });
+  res.status(404).json({ error: "Not found" });
 });
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const msg = err instanceof Error ? err.message : "Errore server";
+  const msg = err instanceof Error ? err.message : "Server error";
   console.error(err);
   res.status(500).json({ error: msg });
 });
@@ -74,16 +74,16 @@ async function main() {
     try {
       const r = await mergeDbInitIntoExisting();
       if (r.addedShipments > 0) {
-        console.log(`[db] Merge db_init: aggiunte ${r.addedShipments} shipment(s).`);
+        console.log(`[db] Merge db_init: added ${r.addedShipments} shipment(s).`);
       }
     } catch (e) {
-      console.error("[db] Merge db_init on start fallito:", e);
+      console.error("[db] Merge db_init on start failed:", e);
     }
   }
   initMasterWallet();
   await logMasterWalletStatus();
   app.listen(PORT, () => {
-    console.log(`Backend in ascolto su http://localhost:${PORT}`);
+    console.log(`Backend listening at http://localhost:${PORT}`);
   });
 }
 

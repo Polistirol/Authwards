@@ -14,11 +14,11 @@ export type JwtUserPayload = {
   email: string | null;
   name: string;
   walletAddress?: string;
-  /** Solo al primo login (OAuth). */
+  /** Only on first login (OAuth). */
   firstLogin?: boolean;
   mnemonic?: string;
   privateKeyHex?: string;
-  /** JWT legacy (pre providerId). */
+  /** Legacy JWT (pre-providerId). */
   googleId?: string;
 };
 
@@ -47,19 +47,19 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
   try {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
-      res.status(500).json({ error: "JWT_SECRET non configurato" });
+      res.status(500).json({ error: "JWT_SECRET not set" });
       return;
     }
     const header = req.headers.authorization;
     if (!header?.startsWith("Bearer ")) {
-      res.status(401).json({ error: "Token mancante o non valido" });
+      res.status(401).json({ error: "Missing or invalid token" });
       return;
     }
     const token = header.slice("Bearer ".length).trim();
     const decoded = jwt.verify(token, secret) as jwt.JwtPayload & JwtUserPayload & { googleId?: string };
     const id = resolveProviderIdentity(decoded);
     if (!id || !decoded.did) {
-      res.status(401).json({ error: "Token non valido" });
+      res.status(401).json({ error: "Invalid token" });
       return;
     }
     const email =
@@ -81,6 +81,6 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
     };
     next();
   } catch {
-    res.status(401).json({ error: "Token non valido o scaduto" });
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 }

@@ -29,13 +29,13 @@ let githubStrategyRegistered = false;
 
 function getJwtSecret(): string {
   const s = process.env.JWT_SECRET;
-  if (!s) throw new Error("JWT_SECRET non configurato");
+  if (!s) throw new Error("JWT_SECRET not set");
   return s;
 }
 
 function getFrontendUrl(): string {
   const u = process.env.FRONTEND_URL;
-  if (!u) throw new Error("FRONTEND_URL non configurato");
+  if (!u) throw new Error("FRONTEND_URL not set");
   return u.replace(/\/+$/, "");
 }
 
@@ -83,7 +83,7 @@ function redirectBaseFromState(req: { query: Record<string, unknown> }, fallback
   return fallback;
 }
 
-/** Risposta API: niente chiave cifrata né mnemonic. */
+/** API response: no encrypted key or mnemonic. */
 function toPublicUser(u: DbUser) {
   const {
     encryptedPrivateKey: _enc,
@@ -139,7 +139,7 @@ async function completeOAuthLogin(
           );
         }
       } catch (airErr) {
-        console.warn("[auth] Welcome airdrop fallito (login continua):", airErr);
+        console.warn("[auth] Welcome airdrop failed (login continues):", airErr);
       }
     }
 
@@ -189,7 +189,7 @@ async function completeOAuthLogin(
     redirect.searchParams.set("recovery", firstLoginMnemonic);
   }
   console.log(
-    `[auth] OAuth OK → redirect a ${redirect.origin}${redirect.pathname} (JWT, provider=${user.providerType}, id=${user.providerId.slice(0, 8)}…)`,
+    `[auth] OAuth OK → redirect to ${redirect.origin}${redirect.pathname} (JWT, provider=${user.providerType}, id=${user.providerId.slice(0, 8)}…)`,
   );
   res.redirect(redirect.toString());
 }
@@ -199,7 +199,7 @@ export function configureOAuthStrategies() {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const callbackURL = process.env.GOOGLE_CALLBACK_URL;
   if (!clientID || !clientSecret || !callbackURL) {
-    throw new Error("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET o GOOGLE_CALLBACK_URL mancanti");
+    throw new Error("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, or GOOGLE_CALLBACK_URL missing");
   }
 
   passport.use(
@@ -251,7 +251,7 @@ router.get("/google", (req, res, next) => {
     const state = encodeOAuthReturnState(returnTo);
     passport.authenticate("google", {
       scope: ["profile", "email"],
-      /** Mostra sempre il selettore account Google (altrimenti riusa la sessione browser). */
+      /** Always show Google account picker (otherwise reuses browser session). */
       prompt: "select_account",
       session: false,
       state,
@@ -282,8 +282,8 @@ router.get(
         picture,
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Errore durante il login";
-      console.error("[auth] OAuth callback errore (es. IOTA/faucet):", msg);
+      const msg = e instanceof Error ? e.message : "Login error";
+      console.error("[auth] OAuth callback error (e.g. IOTA/faucet):", msg);
       const redirect = new URL(returnBase);
       redirect.searchParams.set("error", "oauth_callback");
       redirect.searchParams.set("detail", msg.slice(0, 200));
@@ -294,7 +294,7 @@ router.get(
 
 router.get("/github", (req, res, next) => {
   if (!githubStrategyRegistered) {
-    res.status(503).json({ error: "GitHub OAuth non configurato (GITHUB_CLIENT_ID / SECRET / CALLBACK_URL)" });
+    res.status(503).json({ error: "GitHub OAuth not configured (GITHUB_CLIENT_ID / SECRET / CALLBACK_URL)" });
     return;
   }
   try {
@@ -316,7 +316,7 @@ router.get(
   "/github/callback",
   (req, res, next) => {
     if (!githubStrategyRegistered) {
-      res.status(503).json({ error: "GitHub OAuth non configurato" });
+      res.status(503).json({ error: "GitHub OAuth not configured" });
       return;
     }
     passport.authenticate("github", {
@@ -342,8 +342,8 @@ router.get(
         picture,
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Errore durante il login";
-      console.error("[auth] GitHub OAuth callback errore:", msg);
+      const msg = e instanceof Error ? e.message : "Login error";
+      console.error("[auth] GitHub OAuth callback error:", msg);
       const redirect = new URL(returnBase);
       redirect.searchParams.set("error", "oauth_callback");
       redirect.searchParams.set("detail", msg.slice(0, 200));
@@ -357,12 +357,12 @@ router.get("/me", requireJwt, async (req, res) => {
     const jwtUser = req.user as JwtUserPayload;
     const user = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
     if (!user) {
-      res.status(404).json({ error: "Utente non trovato" });
+      res.status(404).json({ error: "User not found" });
       return;
     }
     res.json(toPublicUser(user));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore interno";
+    const msg = e instanceof Error ? e.message : "Internal error";
     res.status(500).json({ error: msg });
   }
 });

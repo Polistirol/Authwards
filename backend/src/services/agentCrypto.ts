@@ -4,11 +4,11 @@ const PBKDF2_ITERATIONS = 210_000;
 
 function deriveKey(scopeId: string, salt: Buffer): Buffer {
   const jwtSecret = process.env.JWT_SECRET;
-  if (!jwtSecret) throw new Error("JWT_SECRET non configurato");
+  if (!jwtSecret) throw new Error("JWT_SECRET not set");
   return crypto.pbkdf2Sync(`${jwtSecret}${scopeId}`, salt, PBKDF2_ITERATIONS, 32, "sha256");
 }
 
-/** Cifratura AES-256-GCM; `scopeId` = `providerId` utente o DID agente, pepper PBKDF2 con JWT_SECRET. */
+/** AES-256-GCM encryption; `scopeId` = user `providerId` or agent DID, PBKDF2 pepper with JWT_SECRET. */
 export function encryptAgentPrivateKey(scopeId: string, secretSeed: Uint8Array): {
   encryptedPrivateKey: string;
   iv: string;
@@ -26,7 +26,7 @@ export function encryptAgentPrivateKey(scopeId: string, secretSeed: Uint8Array):
   };
 }
 
-/** Decripta il seed del wallet utente (PBKDF2 con `providerId`; fallback su `googleId` legacy e `did`). */
+/** Decrypts the user wallet seed (PBKDF2 with `providerId`; fallback to legacy `googleId` and `did`). */
 export function decryptUserWalletSecret(user: {
   providerId: string;
   googleId?: string;
@@ -36,7 +36,7 @@ export function decryptUserWalletSecret(user: {
   salt?: string;
 }): Uint8Array {
   if (!user.encryptedPrivateKey || !user.iv || !user.salt) {
-    throw new Error("Dati cifratura wallet mancanti");
+    throw new Error("Wallet encryption data missing");
   }
   const legacyGoogle = user.googleId;
   try {
@@ -63,7 +63,7 @@ export function decryptPrivateKey(
   const iv = Buffer.from(ivB64, "base64");
   const combined = Buffer.from(encryptedPrivateKeyB64, "base64");
   const authTagLen = 16;
-  if (combined.length < authTagLen) throw new Error("Payload cifrato non valido");
+  if (combined.length < authTagLen) throw new Error("Invalid encrypted payload");
   const ciphertext = combined.subarray(0, combined.length - authTagLen);
   const authTag = combined.subarray(combined.length - authTagLen);
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);

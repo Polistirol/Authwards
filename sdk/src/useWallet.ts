@@ -11,7 +11,7 @@ export type WalletBalanceResponse = {
 
 export type UseWalletResult = {
   loading: boolean;
-  /** Ultimo saldo letto con `getBalance` (stringa nanos dall’API). */
+  /** Last balance read with `getBalance` (nanos string from the API). */
   balance: string | null;
   getBalance: (address: string) => Promise<WalletBalanceResponse>;
   transferToAgent: (agentAddress: string, amountNanos: number) => Promise<{
@@ -59,7 +59,7 @@ export function useWallet(): UseWalletResult {
 
   const transferToAgent = useCallback(
     async (agentAddress: string, amountNanos: number) => {
-      if (!token) throw new Error("Autenticazione richiesta");
+      if (!token) throw new Error("Authentication required");
       setLoading(true);
       try {
         const res = await fetch(`${trimTrailingSlash(backendUrl)}/wallet/transfer`, {

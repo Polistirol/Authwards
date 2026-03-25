@@ -20,7 +20,7 @@ export function setWalletChallenge(walletAddress: string, nonce: string): void {
   store.set(addrKey(walletAddress), { nonce, expiresAt: Date.now() + TTL_MS });
 }
 
-/** Rimuove e restituisce true se nonce valido e corrispondente. */
+/** Removes and returns true if the nonce is valid and matches. */
 export function consumeWalletChallenge(walletAddress: string, nonce: string): boolean {
   prune();
   const k = addrKey(walletAddress);

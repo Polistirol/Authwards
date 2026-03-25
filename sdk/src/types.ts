@@ -25,24 +25,24 @@ export type AgentTaskConfig = {
 export type Agent = {
   agentDid: string;
   ownerDid: string;
-  /** Nome visualizzato in dashboard. */
+  /** Display name in the dashboard. */
   name?: string;
   description?: string;
   permissionProfile: string;
-  /** IOTA interi salvati alla creazione (profilo + custom). */
+  /** Whole IOTA limits stored at creation (profile + custom). */
   permitMaxPerTxIota?: string;
   permitMaxPerDayIota?: string;
-  /** Scadenza permit (ms Unix); "0" = mai. */
+  /** Permit expiry (Unix ms); "0" = never. */
   permitExpiresAtMs?: string;
   createdAt: string;
-  /** Legacy: preferire `status`. */
+  /** Legacy: prefer `status`. */
   active?: boolean;
   walletAddress?: string;
   status?: AgentStatus;
   activatedAt?: string | null;
   spentTodayNanos?: string;
   spentTodayDate?: string;
-  /** Mascherato lato API (lista). */
+  /** Masked by the API (list view). */
   agentToken?: string;
   taskType?: string;
   taskConfig?: AgentTaskConfig;

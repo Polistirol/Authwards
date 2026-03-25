@@ -19,7 +19,7 @@ const router = Router();
 
 function getJwtSecret(): string {
   const s = process.env.JWT_SECRET;
-  if (!s) throw new Error("JWT_SECRET non configurato");
+  if (!s) throw new Error("JWT_SECRET not set");
   return s;
 }
 
@@ -53,7 +53,7 @@ router.post("/wallet/challenge", async (req, res) => {
   try {
     const walletAddress = typeof req.body?.walletAddress === "string" ? req.body.walletAddress.trim() : "";
     if (!walletAddress) {
-      res.status(400).json({ error: "Body richiede { walletAddress: string }" });
+      res.status(400).json({ error: "Body requires { walletAddress: string }" });
       return;
     }
     const nonce = crypto.randomBytes(32).toString("hex");
@@ -61,7 +61,7 @@ router.post("/wallet/challenge", async (req, res) => {
     setWalletChallenge(walletAddress, nonce);
     res.json({ nonce, message });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore challenge";
+    const msg = e instanceof Error ? e.message : "Challenge error";
     res.status(500).json({ error: msg });
   }
 });
@@ -73,11 +73,11 @@ router.post("/wallet/verify", async (req, res) => {
     const signature = typeof req.body?.signature === "string" ? req.body.signature.trim() : "";
     const nonce = typeof req.body?.nonce === "string" ? req.body.nonce.trim() : "";
     if (!walletAddress || !signature || !nonce) {
-      res.status(400).json({ error: "Body richiede { walletAddress, signature, nonce }" });
+      res.status(400).json({ error: "Body requires { walletAddress, signature, nonce }" });
       return;
     }
     if (!consumeWalletChallenge(walletAddress, nonce)) {
-      res.status(401).json({ error: "Nonce non valido o scaduto" });
+      res.status(401).json({ error: "Invalid or expired nonce" });
       return;
     }
     const message = buildWalletLoginMessage(nonce);
@@ -88,13 +88,13 @@ router.post("/wallet/verify", async (req, res) => {
         address: normalizeIotaAddress(walletAddress),
       });
     } catch {
-      res.status(401).json({ error: "Firma non valida" });
+      res.status(401).json({ error: "Invalid signature" });
       return;
     }
     const derived = normalizeIotaAddress(publicKey.toIotaAddress());
     const claimed = normalizeIotaAddress(walletAddress);
     if (derived !== claimed) {
-      res.status(401).json({ error: "Indirizzo wallet non corrispondente alla firma" });
+      res.status(401).json({ error: "Wallet address does not match signature" });
       return;
     }
 
@@ -123,7 +123,7 @@ router.post("/wallet/verify", async (req, res) => {
     const token = signUserJwt(user);
     res.json({ token, user: toPublicUser(user) });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore verifica wallet";
+    const msg = e instanceof Error ? e.message : "Wallet verification error";
     console.error("[auth/wallet/verify]", e);
     res.status(500).json({ error: msg });
   }
@@ -158,7 +158,7 @@ function verifyTelegramAuth(data: Record<string, unknown>, botToken: string): bo
 
 let cachedBotUsername: string | null | undefined = undefined;
 
-/** Username del bot per il widget Login (data-telegram-login); da getMe, così serve solo TELEGRAM_BOT_TOKEN. */
+/** Bot username for the Login widget (data-telegram-login); from getMe so only TELEGRAM_BOT_TOKEN is required. */
 async function getTelegramBotUsername(): Promise<string | null> {
   if (cachedBotUsername !== undefined) return cachedBotUsername;
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
@@ -191,10 +191,10 @@ function escapeHtml(s: string): string {
 function htmlTelegramSuccess(token: string): string {
   const payload = JSON.stringify({ type: "iota-auth-token", token });
   return `<!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IOTA Auth</title></head>
 <body style="margin:0;background:#0b0c0f;color:#a1a1aa;font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;">
-<p style="margin:0;font-size:0.9rem;">Accesso completato. Questa finestra si chiude…</p>
+<p style="margin:0;font-size:0.9rem;">Sign-in complete. This window will close…</p>
 <script>
 (function(){
   var payload = ${payload};
@@ -213,8 +213,8 @@ function htmlTelegramSuccess(token: string): string {
 function htmlTelegramError(message: string, _httpStatus: number): string {
   const payload = JSON.stringify({ type: "iota-auth-error", error: message });
   return `<!DOCTYPE html>
-<html lang="it">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Errore</title></head>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Error</title></head>
 <body style="margin:0;background:#0b0c0f;color:#f87171;font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;">
 <p style="margin:0;font-size:0.9rem;max-width:320px;text-align:center;">${escapeHtml(message)}</p>
 <script>
@@ -239,22 +239,22 @@ type TelegramVerifyResult =
 async function processTelegramVerify(body: Record<string, unknown>): Promise<TelegramVerifyResult> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!botToken) {
-    return { ok: false, status: 503, message: "TELEGRAM_BOT_TOKEN non configurato" };
+    return { ok: false, status: 503, message: "TELEGRAM_BOT_TOKEN not set" };
   }
   if (!body || typeof body !== "object") {
-    return { ok: false, status: 400, message: "Body JSON richiesto" };
+    return { ok: false, status: 400, message: "JSON body required" };
   }
   if (!verifyTelegramAuth(body, botToken)) {
-    return { ok: false, status: 401, message: "Firma Telegram non valida" };
+    return { ok: false, status: 401, message: "Invalid Telegram signature" };
   }
   const authDate = Number(body.auth_date);
   if (!Number.isFinite(authDate) || Date.now() / 1000 - authDate > 300) {
-    return { ok: false, status: 401, message: "auth_date troppo vecchio" };
+    return { ok: false, status: 401, message: "auth_date too old" };
   }
   const id = body.id;
   const providerId = typeof id === "number" ? String(id) : typeof id === "string" ? id : "";
   if (!providerId) {
-    return { ok: false, status: 400, message: "Campo id mancante" };
+    return { ok: false, status: 400, message: "Missing id field" };
   }
   const first = typeof body.first_name === "string" ? body.first_name : "";
   const last = typeof body.last_name === "string" ? body.last_name : "";
@@ -321,7 +321,7 @@ router.get("/telegram/login", async (_req, res) => {
   try {
     const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
     if (!botToken) {
-      res.status(503).type("html").send(htmlTelegramError("Telegram non configurato sul server.", 503));
+      res.status(503).type("html").send(htmlTelegramError("Telegram is not configured on the server.", 503));
       return;
     }
     const botUsername = await getTelegramBotUsername();
@@ -329,11 +329,11 @@ router.get("/telegram/login", async (_req, res) => {
       res
         .status(503)
         .type("html")
-        .send(htmlTelegramError("Impossibile risolvere lo username del bot (getMe).", 503));
+        .send(htmlTelegramError("Could not resolve bot username (getMe).", 503));
       return;
     }
     const html = `<!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -347,7 +347,7 @@ router.get("/telegram/login", async (_req, res) => {
 </head>
 <body>
   <p class="logo">IOTA Auth</p>
-  <p class="sub">Accedi con il tuo account Telegram</p>
+  <p class="sub">Sign in with your Telegram account</p>
   <div id="tg-widget"></div>
   <script>
     function onTelegramAuth(user) {
@@ -360,7 +360,7 @@ router.get("/telegram/login", async (_req, res) => {
         document.write(html);
         document.close();
       }).catch(function () {
-        document.body.innerHTML = '<p style="color:#f87171;padding:24px;text-align:center;font-family:system-ui,sans-serif;">Errore di rete</p>';
+        document.body.innerHTML = '<p style="color:#f87171;padding:24px;text-align:center;font-family:system-ui,sans-serif;">Network error</p>';
       });
     }
   </script>
@@ -373,7 +373,7 @@ router.get("/telegram/login", async (_req, res) => {
 </html>`;
     res.type("html").send(html);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore";
+    const msg = e instanceof Error ? e.message : "Error";
     console.error("[auth/telegram/login]", e);
     res.status(500).type("html").send(htmlTelegramError(msg, 500));
   }
@@ -389,7 +389,7 @@ router.post("/telegram/verify", async (req, res) => {
     }
     res.type("html").send(htmlTelegramSuccess(result.token));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore Telegram";
+    const msg = e instanceof Error ? e.message : "Telegram error";
     console.error("[auth/telegram/verify]", e);
     res.status(500).type("html").send(htmlTelegramError(msg, 500));
   }

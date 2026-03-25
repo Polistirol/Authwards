@@ -4,13 +4,13 @@ import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 
 function getPlatformSecret(): string {
   const s = process.env.PLATFORM_DERIVATION_SECRET?.trim();
-  if (!s) throw new Error("PLATFORM_DERIVATION_SECRET non configurato nel .env");
+  if (!s) throw new Error("PLATFORM_DERIVATION_SECRET not set in .env");
   return s;
 }
 
 /**
- * Deriva deterministica la keypair Ed25519 dell'agente (HKDF-SHA256 → 32 byte seed IOTA).
- * Stessi input ⇒ stessa chiave (nessun salvataggio on-disk).
+ * Deterministically derives the agent Ed25519 keypair (HKDF-SHA256 → 32-byte IOTA seed).
+ * Same inputs ⇒ same key (nothing persisted on disk).
  */
 export function deriveAgentKeypair(
   ownerProviderId: string,
