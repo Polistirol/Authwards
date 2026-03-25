@@ -25,7 +25,7 @@ type SnippetApiResponse = {
   providers: Record<string, SnippetProviderMeta>;
 };
 
-type TabId = "n8n" | "python" | "arduino" | "javascript" | "curl";
+type TabId = "n8n" | "python" | "zapier" | "arduino" | "javascript" | "curl";
 
 type SnippetModalProps = {
   open: boolean;
@@ -163,6 +163,7 @@ function downloadText(filename: string, body: string, mime: string) {
 const TAB_ORDER: { id: TabId; label: string }[] = [
   { id: "n8n", label: "n8n" },
   { id: "python", label: "Python" },
+  { id: "zapier", label: "Zapier" },
   { id: "arduino", label: "Arduino" },
   { id: "javascript", label: "JavaScript" },
   { id: "curl", label: "cURL" },
@@ -303,7 +304,7 @@ export default function SnippetModal({
             ? "text/x-shellscript"
             : currentProvider.fileType === "js"
               ? "text/javascript"
-              : currentProvider.fileType === "ino"
+              : currentProvider.fileType === "ino" || currentProvider.fileType === "txt"
                 ? "text/plain"
                 : "text/plain";
     downloadText(currentProvider.fileName, downloadCode, mime);

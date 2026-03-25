@@ -247,6 +247,33 @@ if __name__ == "__main__":
         
         time.sleep(CHECK_INTERVAL)`;
 
+  const zapierContent = `Authward Agent — ${agentName}
+DID: ${agentDid}
+
+Zapier has no import file. Create a Zap, add Webhooks by Zapier → POST actions,
+and use the config below.
+
+=== AUTHWARD CONFIG ===
+PLATFORM_URL = ${platformUrl}
+AGENT_TOKEN = ${agentToken}
+
+For every POST request, add this header:
+  Authorization: Bearer <paste AGENT_TOKEN>
+
+=== ENDPOINTS (all POST) ===
+1) ${platformUrl}/bridge/activate
+   Run once (or as a dedicated step) before check/execute.
+
+2) ${platformUrl}/bridge/check
+   Poll or run after your trigger; response includes conditionMet.
+
+3) ${platformUrl}/bridge/execute
+   Headers: Content-Type: application/json
+   Body: {"action":"release_payment"}
+
+Typical flow: Trigger → POST activate (optional if already done) → POST check
+→ filter or Paths on conditionMet → POST execute.`;
+
   const curlContent = `#!/bin/bash
 # Authward Agent — ${agentName}
 # DID: ${agentDid}
@@ -333,7 +360,8 @@ main();`;
     providers: {
       n8n: {
         label: "n8n Workflow",
-        description: "Import this file into n8n to get a ready-made workflow",
+        description:
+          "In n8n, open the … menu at the top right of the workflow, then choose Import from File.",
         fileType: "json",
         fileName: `authward-agent-${safeName}.json`,
         content: n8nWorkflow,
@@ -351,6 +379,13 @@ main();`;
         fileType: "py",
         fileName: "authward_agent.py",
         content: pythonContent,
+      },
+      zapier: {
+        label: "Zapier",
+        description: "Webhooks by Zapier (POST); Zapier has no import file — use the downloaded reference in the editor",
+        fileType: "txt",
+        fileName: `authward-agent-${safeName}-zapier.txt`,
+        content: zapierContent,
       },
       curl: {
         label: "cURL (generic)",

@@ -697,12 +697,16 @@ export default function Dashboard() {
                   <p>
                     <span className="text-slate-500">Status</span>
                     <br />
-                    Not activated — use &quot;Activate Agent&quot; on the card when you are
-                    ready.
+                    <span className="font-semibold text-amber-200">Not activated</span>
+                  </p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Use{" "}
+                    <span className="font-semibold text-[#6ee7b7]">Activate Agent</span> on the
+                    card when you are ready.
                   </p>
                   <p className="pt-2 text-slate-400">
-                    You can already copy the snippet to prepare n8n; the agent will
-                    work after activation from the dashboard.
+                    You can already copy the snippet to prepare your workflow; the agent will work
+                    after activation from the dashboard.
                   </p>
                 </div>
                 <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-end">
@@ -712,19 +716,6 @@ export default function Dashboard() {
                     className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
                   >
                     Close
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSnippetAgentDid(createResult.agentDid);
-                      setSnippetStatus("created");
-                      setCreateOpen(false);
-                      setCreateStep("pick");
-                      setCreateResult(null);
-                    }}
-                    className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
-                  >
-                    Connect your workflow
                   </button>
                 </div>
               </>
