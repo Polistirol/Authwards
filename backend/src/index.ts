@@ -4,7 +4,7 @@ import cors from "cors";
 import express from "express";
 import passport from "passport";
 
-import { getAllowedFrontendOrigins } from "./allowedFrontendOrigins.js";
+import { isOriginAllowedForCors } from "./allowedFrontendOrigins.js";
 import { ensureDbFile, mergeDbInitIntoExisting } from "./services/db.js";
 import { initMasterWallet, logMasterWalletStatus } from "./services/masterWallet.js";
 import { configureOAuthStrategies } from "./routes/auth.js";
@@ -23,12 +23,9 @@ const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 function corsOriginOption():
   | boolean
   | ((origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => void) {
-  const list = getAllowedFrontendOrigins();
-  if (list.length === 0) return true;
-
   return (origin, cb) => {
     if (!origin) return cb(null, true);
-    cb(null, list.includes(origin));
+    cb(null, isOriginAllowedForCors(origin));
   };
 }
 

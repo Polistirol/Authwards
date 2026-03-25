@@ -64,3 +64,39 @@ export function isOriginAllowed(origin: string): boolean {
   const n = normalizeOrigin(origin);
   return getAllowedFrontendOrigins().includes(n);
 }
+
+function isPublicHttpsOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin);
+    return u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isLocalHttpOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin);
+    if (u.protocol !== "http:") return false;
+    const h = u.hostname.toLowerCase();
+    return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * CORS allowlist for browser `fetch` from embedded SDK.
+ *
+ * - Always allows origins in `getAllowedFrontendOrigins()` (FRONTEND_URL / FRONTEND_URLS / ALLOWED_ORIGINS).
+ * - If `CORS_STRICT_ORIGINS` is **not** `true`, also allows any `https:` origin and `http:` on localhost
+ *   (same spirit as OAuth `return_to` + Referer: third-party dApps without registering each URL).
+ * - Set `CORS_STRICT_ORIGINS=true` to **only** use the configured allowlist (stricter deployments).
+ */
+export function isOriginAllowedForCors(origin: string): boolean {
+  const n = normalizeOrigin(origin);
+  if (getAllowedFrontendOrigins().includes(n)) return true;
+  const strict = process.env.CORS_STRICT_ORIGINS?.trim().toLowerCase() === "true";
+  if (strict) return false;
+  return isPublicHttpsOrigin(n) || isLocalHttpOrigin(n);
+}
