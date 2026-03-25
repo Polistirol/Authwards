@@ -86,6 +86,7 @@ export type DbAgentLog = {
 
 export type DbShipment = {
   id: string;
+  trackingNumber?: string;
   product: string;
   origin: string;
   destination: string;

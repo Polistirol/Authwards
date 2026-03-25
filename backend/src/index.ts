@@ -60,6 +60,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: msg });
 });
 
+/** Optional: merge only *new* shipment ids from `db_init.json` into existing `db.json`. Off by default (testing). */
 function mergeDbInitOnStartEnabled(): boolean {
   const v = process.env.MERGE_DB_INIT_ON_START?.trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes";

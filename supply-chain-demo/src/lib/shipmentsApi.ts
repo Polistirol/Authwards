@@ -1,5 +1,6 @@
 export type Shipment = {
   id: string;
+  trackingNumber?: string;
   product: string;
   origin: string;
   destination: string;

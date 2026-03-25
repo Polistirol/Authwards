@@ -190,7 +190,13 @@ export async function ensureDbFile(): Promise<void> {
     const init = await readDbInitFromDisk();
     if (init) {
       await fs.writeFile(DB_PATH, JSON.stringify(init, null, 2), "utf8");
+      console.log(
+        `[db] No db.json — created from db_init.json (${init.shipments.length} shipment(s), ${init.users.length} user(s)).`,
+      );
     } else {
+      console.warn(
+        "[db] No db.json and db_init.json missing or unreadable — created empty db.json (no demo shipments).",
+      );
       await fs.writeJson(DB_PATH, emptyDb(), { spaces: 2 });
     }
     return;
@@ -203,6 +209,7 @@ export async function ensureDbFile(): Promise<void> {
       await writeDb(shape);
     }
   } catch {
+    console.error("[db] db.json corrupt — replacing with empty db.json");
     await fs.writeJson(DB_PATH, emptyDb(), { spaces: 2 });
   }
 }

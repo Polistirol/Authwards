@@ -181,6 +181,12 @@ export function ShipmentDetail() {
                 <dt className="text-slate-500">ID</dt>
                 <dd className="font-mono text-slate-200">{shipment.id}</dd>
               </div>
+              {shipment.trackingNumber ? (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-500">Tracking</dt>
+                  <dd className="font-mono text-slate-200">{shipment.trackingNumber}</dd>
+                </div>
+              ) : null}
               <div className="flex justify-between gap-4">
                 <dt className="text-slate-500">Status</dt>
                 <dd className="text-slate-200">{formatShipmentStatus(shipment.status)}</dd>

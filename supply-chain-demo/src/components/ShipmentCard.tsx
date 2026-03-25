@@ -58,9 +58,16 @@ export function ShipmentCard({ shipment, agent }: ShipmentCardProps) {
         className="group w-full cursor-pointer rounded-2xl border border-slate-600/80 bg-[#1e293b] p-5 text-left shadow-lg transition hover:border-amber-500/40 hover:shadow-amber-500/5"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <h3 className="text-lg font-semibold text-white group-hover:text-amber-100">
-            {shipment.product}
-          </h3>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-semibold text-white group-hover:text-amber-100">
+              {shipment.product}
+            </h3>
+            {shipment.trackingNumber ? (
+              <p className="mt-1 font-mono text-xs text-slate-500">
+                Tracking <span className="text-slate-400">{shipment.trackingNumber}</span>
+              </p>
+            ) : null}
+          </div>
           <span
             className={`inline-flex shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${badge.cls}`}
           >
