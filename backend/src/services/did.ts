@@ -5,7 +5,7 @@ import { decodeIotaPrivateKey } from "@iota/iota-sdk/cryptography";
 import { requestIotaFromFaucetV0 } from "@iota/iota-sdk/faucet";
 import type { IotaTransactionBlockResponse } from "@iota/iota-sdk/client";
 import { IotaClient } from "@iota/iota-sdk/client";
-import { getMasterKeypair } from "./masterWallet.js";
+import { getMasterAddress, getMasterKeypair } from "./masterWallet.js";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 import { Ed25519KeypairSigner } from "@iota/iota-interaction-ts/node/test_utils/ed_25519_keypair_signer.js";
 import {
@@ -201,6 +201,7 @@ export async function createDid(
   const txb: any = identityClient.createIdentity(unpublished).finish();
   const { output: identity, response: rawRes } = await txb
     .withGasBudget(getDidGasBudget())
+    .withGasOwner(getMasterAddress())
     .buildAndExecute(identityClient);
   const tx = unwrapTxResponse(rawRes);
   const doc = identity.didDocument();
@@ -254,6 +255,7 @@ export async function createDidForWalletOwner(publicKey: PublicKey): Promise<{
   const txb: any = identityClient.createIdentity(unpublished).finish();
   const { output: identity, response: rawRes } = await txb
     .withGasBudget(getDidGasBudget())
+    .withGasOwner(getMasterAddress())
     .buildAndExecute(identityClient);
   const tx = unwrapTxResponse(rawRes);
   const doc = identity.didDocument();
@@ -296,6 +298,7 @@ export async function createAgentDid(params: {
   const txb: any = identityClient.createIdentity(unpublished).finish();
   const { output: identity, response: rawRes } = await txb
     .withGasBudget(getDidGasBudget())
+    .withGasOwner(getMasterAddress())
     .buildAndExecute(identityClient);
   const tx = unwrapTxResponse(rawRes);
   const doc = identity.didDocument();
