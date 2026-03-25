@@ -8,6 +8,7 @@ node_modules/
 
 # App-local data (paths used by backend; do not commit real DB/keys)
 db.json
+db-snapshot.json
 keys.json
 
 # Local dev cheatsheet (URLs / curl); not for the repo
