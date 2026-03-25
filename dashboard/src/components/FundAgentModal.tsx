@@ -31,7 +31,7 @@ export default function FundAgentModal({
     setError(null);
     const n = parseFloat(iotaAmount.replace(",", "."));
     if (!Number.isFinite(n) || n <= 0) {
-      setError("Inserisci un importo valido in IOTA (es. 0.1).");
+      setError("Enter a valid IOTA amount (e.g. 0.1).");
       return;
     }
     const nanos = Math.floor(n * 1e9);
@@ -59,7 +59,7 @@ export default function FundAgentModal({
       onClose();
       setIotaAmount("0.1");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Errore di rete");
+      setError(e instanceof Error ? e.message : "Network error");
     } finally {
       setBusy(false);
     }
@@ -81,16 +81,16 @@ export default function FundAgentModal({
         }}
       >
         <h2 id="fund-title" className="text-xl font-semibold text-white">
-          Fondi Agente
+          Fund Agent
         </h2>
         <p className="mt-2 text-sm text-slate-400">
-          Trasferisci IOTA dal tuo wallet collegato all&apos;indirizzo dell&apos;agente.
+          Transfer IOTA from your connected wallet to the agent address.
         </p>
         <p className="mt-3 max-w-full break-all font-mono text-xs text-[#6ee7b7]">
           {toAddress}
         </p>
         <label className="mt-4 block">
-          <span className="text-xs uppercase text-slate-500">Importo (IOTA)</span>
+          <span className="text-xs uppercase text-slate-500">IOTA amount to transfer</span>
           <input
             type="text"
             inputMode="decimal"
@@ -107,7 +107,7 @@ export default function FundAgentModal({
             onClick={onClose}
             className="rounded-lg border border-[#2a2d3a] px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
           >
-            Annulla
+            Cancel
           </button>
           <button
             type="button"
@@ -115,7 +115,7 @@ export default function FundAgentModal({
             onClick={() => void submit()}
             className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] disabled:opacity-50"
           >
-            {busy ? "Invio…" : "Invia"}
+            {busy ? "Sending…" : "Transfer"}
           </button>
         </div>
       </div>

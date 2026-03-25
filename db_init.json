@@ -6,7 +6,7 @@
       {
         "id": "SHIP-001",
         "trackingNumber": "1234567890",
-        "product": "Caffè Arabica - Batch #4821",
+        "product": "Arabica Coffee - Batch #4821",
         "origin": "Bogotá, Colombia",
         "destination": "Genoa, Italy",
         "status": "in_transit",
@@ -17,8 +17,8 @@
       {
         "id": "SHIP-002",
         "trackingNumber": "0987654321",
-        "product": "Olio EVO - Batch #1190",
-        "origin": "Kalamata, Grecia",
+        "product": "Extra Virgin Olive Oil - Batch #1190",
+        "origin": "Kalamata, Greece",
         "destination": "Rotterdam, Netherlands",
         "status": "in_transit",
         "supplier": "0xd739979ecb1304f60cbfdb2508303de85afb04e80e667644d81e43a79a1c3dbf",
@@ -28,8 +28,8 @@
       {
         "id": "SHIP-003",
         "trackingNumber": "555111222",
-        "product": "Olio EVO - Batch #1458",
-        "origin": "Kalamata, Grecia",
+        "product": "Extra Virgin Olive Oil - Batch #1458",
+        "origin": "Kalamata, Greece",
         "destination": "Rotterdam, Netherlands",
         "status": "in_transit",
         "supplier": "0xd739979ecb1304f60cbfdb2508303de85afb04e80e667644d81e43a79a1c3dbf",

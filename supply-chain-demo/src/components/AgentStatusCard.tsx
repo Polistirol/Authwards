@@ -26,17 +26,17 @@ function statusBadgeClass(s: AgentStatus): string {
   }
 }
 
-function statusLabelIt(s: AgentStatus): string {
+function statusLabelEn(s: AgentStatus): string {
   switch (s) {
     case "active":
-      return "Attivo";
+      return "Active";
     case "revoked":
-      return "Revocato";
+      return "Revoked";
     case "created":
     case "pending_activation":
-      return "Non attivato";
+      return "Not activated";
     default:
-      return "Non attivato";
+      return "Not activated";
   }
 }
 
@@ -84,7 +84,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
     setFundError(null);
     const n = parseFloat(fundAmount.replace(",", "."));
     if (!Number.isFinite(n) || n <= 0) {
-      setFundError("Inserisci un importo valido.");
+      setFundError("Enter a valid amount.");
       return;
     }
     if (!agent.walletAddress) return;
@@ -94,7 +94,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
       setFundOpen(false);
       void refreshBalance();
     } catch (e) {
-      setFundError(e instanceof Error ? e.message : "Trasferimento fallito");
+      setFundError(e instanceof Error ? e.message : "Transfer failed");
     }
   }
 
@@ -113,7 +113,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
       className="mt-4 rounded-xl border border-slate-600 bg-[#131a2a]/80 p-4"
       onClick={(e) => e.stopPropagation()}
     >
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Agente di pagamento</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Agent</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <code className="text-sm text-amber-400">{truncateDid(agent.agentDid)}</code>
         <button
@@ -121,17 +121,17 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
           onClick={() => void copyDid()}
           className="text-xs text-blue-400 underline hover:text-blue-300"
         >
-          {copied ? "Copiato" : "Copia DID"}
+          {copied ? "Copied" : "Copy DID"}
         </button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <span
           className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(st)}`}
         >
-          {statusLabelIt(st)}
+          {statusLabelEn(st)}
         </span>
         <span className="text-sm text-slate-400">
-          Saldo:{" "}
+          Balance:{" "}
           <span className="font-medium text-slate-200">
             {balanceNanos !== null ? `${nanosToIota(balanceNanos)} IOTA` : "—"}
           </span>
@@ -139,8 +139,8 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
       </div>
       <div className="mt-3 grid gap-1 text-sm text-slate-400">
         <p>
-          Permessi: max <span className="text-slate-200">{caps.maxPerTx}</span> / tx, max{" "}
-          <span className="text-slate-200">{caps.maxPerDay}</span> / giorno
+          Permissions: max <span className="text-slate-200">{caps.maxPerTx}</span> / tx, max{" "}
+          <span className="text-slate-200">{caps.maxPerDay}</span> / day
         </p>
         {agent.permitObjectId ? (
           <p>
@@ -150,7 +150,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
               rel="noreferrer"
               className="text-blue-400 underline hover:text-blue-300"
             >
-              Vedi permessi on-chain
+              View on-chain permissions
             </a>
           </p>
         ) : null}
@@ -161,7 +161,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
           onClick={() => setSnippetOpen(true)}
           className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-500/20"
         >
-          Vedi Snippet
+          View Snippet
         </button>
         <button
           type="button"
@@ -171,7 +171,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
           }}
           className="rounded-lg border border-blue-500/50 bg-blue-500/10 px-3 py-1.5 text-sm font-medium text-blue-300 hover:bg-blue-500/20"
         >
-          Fondi Agente
+          Fund Agent
         </button>
       </div>
 
@@ -195,12 +195,12 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-white">Fondi agente</h3>
+            <h3 className="text-lg font-semibold text-white">Fund Agent</h3>
             <p className="mt-2 text-sm text-slate-400">
-              Trasferisci IOTA dal tuo wallet utente al wallet dell&apos;agente (testnet).
+              Transfer IOTA from your user wallet to the agent wallet (testnet).
             </p>
             <label className="mt-4 block text-sm text-slate-300">
-              Importo (IOTA)
+              Amount (IOTA)
               <input
                 type="text"
                 inputMode="decimal"
@@ -216,7 +216,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
                 onClick={() => setFundOpen(false)}
                 className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
               >
-                Annulla
+                Cancel
               </button>
               <button
                 type="button"
@@ -224,7 +224,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
                 onClick={() => void handleFund()}
                 className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-[#0c1220] hover:bg-amber-400 disabled:opacity-50"
               >
-                Invia
+                Send
               </button>
             </div>
           </div>

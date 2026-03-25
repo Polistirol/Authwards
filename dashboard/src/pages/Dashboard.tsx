@@ -80,7 +80,7 @@ function DidDocumentBlock({ user }: { user: User }) {
         onClick={() => setOpen((o) => !o)}
         className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-[#6ee7b7] hover:bg-white/10"
       >
-        {open ? "Nascondi DID Document" : "Mostra DID Document"}
+        {open ? "Hide DID Document" : "Show DID Document"}
       </button>
       {open ? (
         <pre className="mt-4 max-h-96 overflow-auto rounded-xl border border-white/10 bg-black/40 p-4 font-mono text-xs leading-relaxed">
@@ -102,18 +102,18 @@ function effectiveAgentStatus(agent: Agent): AgentStatus {
 const PROFILES = [
   {
     id: "readonly" as const,
-    title: "Read only",
-    description: "Nessuna spesa; solo monitoraggio",
+    title: "Read Only",
+    description: "No spending; monitoring only",
   },
   {
     id: "custom" as const,
-    title: "Personalizzato",
-    description: "Imposta tu max IOTA per transazione e per giorno",
+    title: "Custom",
+    description: "Set max IOTA per transaction and per day yourself",
   },
   {
     id: "full_access" as const,
-    title: "Full access",
-    description: "Massimi consentiti dal contratto (1000 / 10000 IOTA al giorno)",
+    title: "Full Access",
+    description: "Maximum allowed by the contract (1000 / 10000 IOTA per day)",
   },
 ];
 
@@ -184,7 +184,7 @@ export default function Dashboard() {
         (prev === "created" || prev === "pending_activation") &&
         cur === "active"
       ) {
-        setToast("Agente attivato!");
+        setToast("Agent activated!");
         window.setTimeout(() => setToast(null), 6000);
       }
       prevStatusRef.current.set(a.agentDid, cur);
@@ -314,7 +314,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0b0f] text-[#e2e4ed]">
-        <p className="text-sm opacity-70">Caricamento…</p>
+        <p className="text-sm opacity-70">Loading…</p>
       </div>
     );
   }
@@ -354,14 +354,14 @@ export default function Dashboard() {
             onClick={logout}
             className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
           >
-            Esci
+            Sign out
           </button>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl space-y-12 px-6 py-10">
         <section>
-          <h2 className="text-lg font-semibold text-white">La tua identità</h2>
+          <h2 className="text-lg font-semibold text-white">Your Identity</h2>
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
             <div className="border-b border-white/10 pb-6">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -378,11 +378,11 @@ export default function Dashboard() {
                       onClick={() => void copyWallet()}
                       className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-xs text-[#6ee7b7] hover:bg-white/10"
                     >
-                      {walletCopied ? "Copiato" : "Copia"}
+                      {walletCopied ? "Copied" : "Copy"}
                     </button>
                   </div>
                   <p className="mt-3 text-sm text-slate-300">
-                    Saldo:{" "}
+                    Balance:{" "}
                     <span className="font-mono text-[#6ee7b7]">
                       {userBalanceNanos !== null
                         ? `${formatIotaFromNanos(userBalanceNanos)} IOTA`
@@ -392,8 +392,7 @@ export default function Dashboard() {
                 </>
               ) : (
                 <p className="mt-2 text-sm text-slate-500">
-                  Nessun wallet associato all&apos;account (completa l&apos;onboarding
-                  OAuth).
+                  No wallet linked to this account (complete OAuth onboarding).
                 </p>
               )}
             </div>
@@ -407,7 +406,7 @@ export default function Dashboard() {
                 onClick={() => void copyDid()}
                 className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-xs text-[#6ee7b7] hover:bg-white/10"
               >
-                {didCopied ? "Copiato" : "Copia"}
+                {didCopied ? "Copied" : "Copy"}
               </button>
             </div>
             <DidDocumentBlock user={user} />
@@ -417,7 +416,7 @@ export default function Dashboard() {
               rel="noopener noreferrer"
               className="mt-4 inline-flex text-sm font-medium text-[#6ee7b7] underline-offset-4 hover:underline"
             >
-              Vedi su IOTA Explorer
+              View on IOTA Explorer
             </a>
           </div>
         </section>
@@ -426,11 +425,10 @@ export default function Dashboard() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-white">
-                Identità Agenti
+                Delegated Identities
               </h2>
               <p className="mt-1 max-w-xl text-sm text-slate-500">
-                Crea identità per i tuoi agenti e collegali al tuo workflow
-                preferito.
+                Create identities for your agents and connect them to your preferred workflow.
               </p>
             </div>
             <button
@@ -449,16 +447,16 @@ export default function Dashboard() {
               }}
               className="rounded-xl bg-[#6ee7b7] px-5 py-2.5 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
             >
-              Crea Agente
+              New Delegated Identity
             </button>
           </div>
 
           {agentsLoading && agents.length === 0 ? (
-            <p className="mt-6 text-sm text-slate-500">Caricamento agenti…</p>
+            <p className="mt-6 text-sm text-slate-500">Loading agents…</p>
           ) : agents.length === 0 ? (
             <p className="mt-6 text-sm text-slate-500">
-              Nessun agente ancora. Crea un&apos;identità agente e collegala a
-              n8n, un bot, o qualsiasi servizio.
+              No delegates yet. Create a delegated agent identity and connect it to
+              n8n, a bot, or any service.
             </p>
           ) : (
             <div className="mt-6 space-y-6">
@@ -501,12 +499,12 @@ export default function Dashboard() {
                 }`}
               >
                 {createStep === "pick"
-                  ? "Nuovo Agente"
-                  : "Agente creato con successo!"}
+                  ? "New Delegated Identity"
+                  : "Agent identity created"}
               </h2>
               <button
                 type="button"
-                aria-label="Chiudi"
+                aria-label="Close"
                 onClick={() => resetCreateDialog()}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 text-lg leading-none text-slate-400 transition hover:bg-white/10 hover:text-white"
               >
@@ -522,14 +520,14 @@ export default function Dashboard() {
                       htmlFor="agent-name"
                       className="block text-xs font-medium uppercase tracking-wide text-slate-500"
                     >
-                      Nome
+                      Name
                     </label>
                     <input
                       id="agent-name"
                       type="text"
                       value={agentName}
                       onChange={(e) => setAgentName(e.target.value)}
-                      placeholder="Es. Monitor spedizioni"
+                      placeholder="e.g. Shipment monitor"
                       autoComplete="off"
                       className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-3 text-sm text-[#e2e4ed] placeholder:text-slate-600 focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
                     />
@@ -539,20 +537,20 @@ export default function Dashboard() {
                       htmlFor="agent-desc"
                       className="block text-xs font-medium uppercase tracking-wide text-slate-500"
                     >
-                      Descrizione
+                      Description
                     </label>
                     <textarea
                       id="agent-desc"
                       value={agentDescription}
                       onChange={(e) => setAgentDescription(e.target.value)}
-                      placeholder="Descrivi cosa farà questo agente nel tuo workflow…"
+                      placeholder="Describe what this agent will do in your workflow…"
                       rows={3}
                       className="mt-2 w-full resize-y rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-3 text-sm text-[#e2e4ed] placeholder:text-slate-600 focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
                     />
                   </div>
                 </div>
                 <p className="mt-6 text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Profilo permessi
+                  Permission profile
                 </p>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {PROFILES.map((p) => (
@@ -587,7 +585,7 @@ export default function Dashboard() {
                         htmlFor="custom-max-tx"
                         className="block text-xs font-medium uppercase tracking-wide text-slate-500"
                       >
-                        Max IOTA per transazione
+                        Max IOTA per transaction
                       </label>
                       <input
                         id="custom-max-tx"
@@ -604,7 +602,7 @@ export default function Dashboard() {
                         htmlFor="custom-max-day"
                         className="block text-xs font-medium uppercase tracking-wide text-slate-500"
                       >
-                        Max IOTA al giorno
+                        Max IOTA per day
                       </label>
                       <input
                         id="custom-max-day"
@@ -627,7 +625,7 @@ export default function Dashboard() {
                       onChange={(e) => setNoPermitExpiry(e.target.checked)}
                     />
                     <span className="text-sm text-slate-300">
-                      Nessuna scadenza del permit on-chain
+                      No on-chain permit expiry
                     </span>
                   </label>
                   {!noPermitExpiry ? (
@@ -636,7 +634,7 @@ export default function Dashboard() {
                         htmlFor="permit-expires"
                         className="block text-xs font-medium uppercase tracking-wide text-slate-500"
                       >
-                        Scadenza permit (locale)
+                        Permit expiry (local)
                       </label>
                       <input
                         id="permit-expires"
@@ -655,7 +653,7 @@ export default function Dashboard() {
                     onClick={() => resetCreateDialog()}
                     className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
                   >
-                    Annulla
+                    Cancel
                   </button>
                   <button
                     type="button"
@@ -663,7 +661,7 @@ export default function Dashboard() {
                     onClick={() => void handleCreateAgent()}
                     className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {creating ? "Creazione…" : "Crea"}
+                    {creating ? "Creating…" : "Create"}
                   </button>
                 </div>
               </>
@@ -671,40 +669,40 @@ export default function Dashboard() {
               <>
                 <div className="space-y-3 text-sm text-slate-300">
                   <p>
-                    <span className="text-slate-500">Nome</span>
+                    <span className="text-slate-500">Name</span>
                     <br />
                     <span className="text-white">{createResult.name}</span>
                   </p>
                   {createResult.description ? (
                     <p>
-                      <span className="text-slate-500">Descrizione</span>
+                      <span className="text-slate-500">Description</span>
                       <br />
                       <span className="text-slate-300">{createResult.description}</span>
                     </p>
                   ) : null}
                   <p>
-                    <span className="text-slate-500">DID agente</span>
+                    <span className="text-slate-500">Agent DID</span>
                     <br />
                     <code className="break-all text-[#6ee7b7]">
                       {createResult.agentDid}
                     </code>
                   </p>
                   <p>
-                    <span className="text-slate-500">Wallet agente</span>
+                    <span className="text-slate-500">Agent wallet</span>
                     <br />
                     <code className="break-all text-[#6ee7b7]">
                       {createResult.walletAddress}
                     </code>
                   </p>
                   <p>
-                    <span className="text-slate-500">Stato</span>
+                    <span className="text-slate-500">Status</span>
                     <br />
-                    Non attivato — usa «Attiva Agente» sulla scheda quando sei
-                    pronto.
+                    Not activated — use &quot;Activate Agent&quot; on the card when you are
+                    ready.
                   </p>
                   <p className="pt-2 text-slate-400">
-                    Puoi già copiare lo snippet per preparare n8n; l’agente
-                    funzionerà dopo l’attivazione dalla dashboard.
+                    You can already copy the snippet to prepare n8n; the agent will
+                    work after activation from the dashboard.
                   </p>
                 </div>
                 <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-end">
@@ -713,7 +711,7 @@ export default function Dashboard() {
                     onClick={() => resetCreateDialog()}
                     className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
                   >
-                    Chiudi
+                    Close
                   </button>
                   <button
                     type="button"
@@ -726,7 +724,7 @@ export default function Dashboard() {
                     }}
                     className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
                   >
-                    Vedi Snippet
+                    Connect your workflow
                   </button>
                 </div>
               </>

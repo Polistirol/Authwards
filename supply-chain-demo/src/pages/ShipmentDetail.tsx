@@ -21,6 +21,19 @@ function effectiveAgentStatus(agent: Agent): AgentStatus {
   return "created";
 }
 
+function formatShipmentStatus(status: string): string {
+  switch (status) {
+    case "in_transit":
+      return "In transit";
+    case "delivered":
+      return "Delivered";
+    case "payment_released":
+      return "Payment released";
+    default:
+      return status;
+  }
+}
+
 function findPaymentLog(logs: AgentLog[]): AgentLog | undefined {
   for (const log of logs) {
     const d = log.data as { meta?: { txHash?: string } } | undefined;
@@ -61,7 +74,7 @@ export function ShipmentDetail() {
       setShipment(s);
       await refreshAgents();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Errore");
+      setErr(e instanceof Error ? e.message : "Error");
     } finally {
       setBusy(false);
     }
@@ -70,6 +83,12 @@ export function ShipmentDetail() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!token || !id) return;
+    const interval = window.setInterval(() => void load(), 25_000);
+    return () => window.clearInterval(interval);
+  }, [token, id, load]);
 
   useEffect(() => {
     if (agent?.agentDid && token) {
@@ -84,7 +103,7 @@ export function ShipmentDetail() {
       const s = await patchShipmentStatus(backendUrl, token, id, "delivered");
       setShipment(s);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Errore");
+      setErr(e instanceof Error ? e.message : "Error");
     } finally {
       setDemoBusy(false);
     }
@@ -94,7 +113,7 @@ export function ShipmentDetail() {
     return (
       <TraceFlowShell>
         <TraceFlowHeader />
-        <main className="p-8 text-slate-400">Spedizione non valida.</main>
+        <main className="p-8 text-slate-400">Invalid shipment.</main>
       </TraceFlowShell>
     );
   }
@@ -103,25 +122,25 @@ export function ShipmentDetail() {
 
   if (shipment) {
     timeline.push({
-      title: "Spedizione creata",
+      title: "Shipment created",
       time: shipment.createdAt,
     });
     if (agent) {
       timeline.push({
-        title: `Identità agente creata: ${truncateDid(agent.agentDid, 24, 12)}`,
+        title: `Agent identity created: ${truncateDid(agent.agentDid, 24, 12)}`,
         time: agent.createdAt,
         extra: agent.agentDid,
       });
       if (effectiveAgentStatus(agent) === "active" && agent.activatedAt) {
         timeline.push({
-          title: "Agente attivato",
+          title: "Agent activated",
           time: agent.activatedAt,
         });
       }
     }
     if (txHash) {
       timeline.push({
-        title: `Pagamento rilasciato: ${txHash}`,
+        title: `Payment released: ${txHash}`,
         time: paymentLog?.timestamp ?? "",
         extra: txHash,
       });
@@ -137,11 +156,11 @@ export function ShipmentDetail() {
               to="/shipments"
               className="rounded-lg border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/5"
             >
-              ← Elenco
+              ← List
             </Link>
             <ConnectButton
               theme="dark"
-              label="Accedi"
+              label="Sign in with Google"
               frontendUrl={import.meta.env.VITE_FRONTEND_URL || undefined}
             />
           </div>
@@ -149,7 +168,7 @@ export function ShipmentDetail() {
       />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         {err ? <p className="text-red-400">{err}</p> : null}
-        {busy && !shipment ? <p className="text-slate-400">Caricamento…</p> : null}
+        {busy && !shipment ? <p className="text-slate-400">Loading…</p> : null}
 
         {shipment ? (
           <>
@@ -163,21 +182,21 @@ export function ShipmentDetail() {
                 <dd className="font-mono text-slate-200">{shipment.id}</dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-slate-500">Stato</dt>
-                <dd className="text-slate-200">{shipment.status}</dd>
+                <dt className="text-slate-500">Status</dt>
+                <dd className="text-slate-200">{formatShipmentStatus(shipment.status)}</dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-slate-500">Pagamento</dt>
+                <dt className="text-slate-500">Payment</dt>
                 <dd className="text-slate-200">{shipment.paymentAmount} IOTA</dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-slate-500">Fornitore (DID)</dt>
+                <dt className="text-slate-500">Supplier (DID)</dt>
                 <dd className="break-all font-mono text-xs text-slate-300">{shipment.supplier}</dd>
               </div>
             </dl>
 
             <div className="mt-10">
-              <h2 className="text-lg font-semibold text-white">Cronologia</h2>
+              <h2 className="text-lg font-semibold text-white">Timeline</h2>
               <ul className="relative mt-4 space-y-0 border-l-2 border-slate-600 pl-6">
                 {timeline.map((ev, i) => (
                   <li key={`${ev.title}-${i}`} className="relative pb-8 last:pb-0">
@@ -186,14 +205,14 @@ export function ShipmentDetail() {
                     {ev.time ? (
                       <p className="mt-1 text-xs text-slate-500">{ev.time}</p>
                     ) : null}
-                    {ev.extra && ev.title.startsWith("Pagamento") ? (
+                    {ev.extra && ev.title.startsWith("Payment released") ? (
                       <a
                         href={explorerTxUrl(ev.extra)}
                         target="_blank"
                         rel="noreferrer"
                         className="mt-2 inline-block text-sm text-blue-400 underline"
                       >
-                        Verifica on-chain
+                        Verify on-chain
                       </a>
                     ) : null}
                   </li>
@@ -208,7 +227,7 @@ export function ShipmentDetail() {
                 disabled={busy}
                 className="rounded-xl border border-slate-600 px-5 py-2 text-sm font-medium text-slate-200 hover:bg-white/5 disabled:opacity-50"
               >
-                Aggiorna
+                Refresh
               </button>
             </div>
 
@@ -218,7 +237,7 @@ export function ShipmentDetail() {
                 {user ? (
                   <>
                     <TrustNode
-                      title="Google Account"
+                      title="Your Google Account"
                       subtitle={user.email ?? user.providerId}
                       icon={
                         user.picture ? (
@@ -232,7 +251,7 @@ export function ShipmentDetail() {
                     />
                     <Arrow />
                     <TrustNode
-                      title="DID Utente"
+                      title="Your DID"
                       subtitle={truncateDid(user.did)}
                       link={explorerDidUrl(user.did)}
                     />
@@ -240,13 +259,13 @@ export function ShipmentDetail() {
                     {agent ? (
                       <>
                         <TrustNode
-                          title="DID Agente + permessi"
+                          title="Agent DID + On-chain Permissions"
                           subtitle={truncateDid(agent.agentDid)}
                           link={explorerDidUrl(agent.agentDid)}
                           extraLink={
                             agent.permitObjectId
                               ? {
-                                  label: "Permessi on-chain",
+                                  label: "View on-chain permissions",
                                   href: explorerObjectUrl(agent.permitObjectId),
                                 }
                               : undefined
@@ -254,13 +273,13 @@ export function ShipmentDetail() {
                         />
                         <Arrow />
                         <TrustNode
-                          title="Transazione"
-                          subtitle={txHash ? truncateDid(txHash, 12, 12) : "In attesa"}
+                          title="Transaction: supplier payment"
+                          subtitle={txHash ? truncateDid(txHash, 12, 12) : "Pending"}
                           link={txHash ? explorerTxUrl(txHash) : undefined}
                         />
                       </>
                     ) : (
-                      <TrustNode title="Agente" subtitle="Non configurato per questa spedizione" />
+                      <TrustNode title="Agent" subtitle="Not configured for this shipment" />
                     )}
                   </>
                 ) : null}
@@ -275,7 +294,7 @@ export function ShipmentDetail() {
                   onClick={() => void handleDemoDeliver()}
                   className="text-sm text-amber-500/90 underline decoration-amber-500/40 underline-offset-4 hover:text-amber-400 disabled:opacity-50"
                 >
-                  ⚡ Simula consegna — solo per demo
+                  ⚡ Simulate delivery — demo only
                 </button>
               </div>
             ) : null}

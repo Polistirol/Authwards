@@ -24,7 +24,11 @@ export function TraceFlowHeader({
 export function TraceFlowFooter() {
   return (
     <footer className="border-t border-slate-700/80 py-6 text-center text-sm text-slate-500">
-      Powered by <span className="text-slate-400">IOTA Auth</span>
+      <span className="text-slate-500">
+        Powered by <span className="text-slate-400">Authward</span>
+        {" — "}
+        Decentralized identity for global trade
+      </span>
     </footer>
   );
 }

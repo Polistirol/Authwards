@@ -56,10 +56,10 @@ function permissionCaps(agent: Agent): {
 
 function permitExpiryLabel(agent: Agent): string {
   const ms = agent.permitExpiresAtMs;
-  if (!ms || ms === "0") return "Mai";
+  if (!ms || ms === "0") return "Never";
   const d = new Date(Number(ms));
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("it-IT", {
+  return d.toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -83,7 +83,7 @@ function formatDate(iso: string | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("it-IT", {
+  return d.toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -199,7 +199,7 @@ export default function AgentCard({
   async function handleRevoke(): Promise<void> {
     if (
       !window.confirm(
-        "Sei sicuro di voler revocare questo agente? L’azione non è reversibile.",
+        "Are you sure you want to revoke this agent? This cannot be undone.",
       )
     ) {
       return;
@@ -230,7 +230,7 @@ export default function AgentCard({
     if (result.ok) {
       setActivateOpen(false);
     } else {
-      setActivateError(result.error ?? "Attivazione non riuscita");
+      setActivateError(result.error ?? "Activation failed");
     }
   }
 
@@ -239,7 +239,7 @@ export default function AgentCard({
     [logs],
   );
 
-  const displayName = agent.name?.trim() || "Agente senza nome";
+  const displayName = agent.name?.trim() || "Unnamed agent";
 
   return (
     <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -266,7 +266,7 @@ export default function AgentCard({
               onClick={() => void copyDid()}
               className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-2 py-0.5 text-xs text-[#6ee7b7] hover:bg-white/10"
             >
-              {copied ? "Copiato" : "Copia DID"}
+              {copied ? "Copied" : "Copy DID"}
             </button>
           </div>
         </div>
@@ -287,7 +287,7 @@ export default function AgentCard({
             {agent.walletAddress || "—"}
           </p>
           <p className="mt-1 text-sm text-slate-300">
-            Saldo:{" "}
+            Balance:{" "}
             <span className="font-mono text-[#6ee7b7]">
               {balanceNanos !== null
                 ? `${formatIota(BigInt(balanceNanos))} IOTA`
@@ -296,22 +296,22 @@ export default function AgentCard({
           </p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase text-slate-500">Permessi</p>
+          <p className="text-xs font-medium uppercase text-slate-500">Permissions</p>
           <ul className="mt-1 space-y-1 text-xs text-slate-400">
-            <li>Max per transazione: {caps.maxTxIota} IOTA</li>
-            <li>Max per giorno: {caps.maxDayIota} IOTA</li>
-            <li>Speso oggi (UTC): {formatIota(spentToday)} IOTA</li>
-            <li>Scadenza permit: {permitExpiryLabel(agent)}</li>
+            <li>Max per transaction: {caps.maxTxIota} IOTA</li>
+            <li>Max per day: {caps.maxDayIota} IOTA</li>
+            <li>Spent today (UTC): {formatIota(spentToday)} IOTA</li>
+            <li>Permit expiry: {permitExpiryLabel(agent)}</li>
           </ul>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase text-slate-500">Creato il</p>
+          <p className="text-xs font-medium uppercase text-slate-500">Created</p>
           <p className="mt-1 text-sm text-slate-200">
             {formatDate(agent.createdAt)}
           </p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase text-slate-500">Attivato il</p>
+          <p className="text-xs font-medium uppercase text-slate-500">Activated</p>
           <p className="mt-1 text-sm text-slate-200">
             {status === "active" && agent.activatedAt
               ? formatDate(agent.activatedAt)
@@ -328,7 +328,7 @@ export default function AgentCard({
               onClick={() => openActivateModal()}
               className="rounded-lg bg-[#6ee7b7] px-5 py-2.5 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
             >
-              Attiva Agente
+              Activate Agent
             </button>
           ) : null}
           {status === "active" ? (
@@ -337,7 +337,7 @@ export default function AgentCard({
               onClick={onOpenSnippet}
               className="rounded-lg border border-[#6ee7b7]/40 bg-[#6ee7b7]/10 px-4 py-2 text-sm font-medium text-[#6ee7b7] hover:bg-[#6ee7b7]/20"
             >
-              Vedi Snippet
+              View Snippet
             </button>
           ) : (
             <button
@@ -345,7 +345,7 @@ export default function AgentCard({
               onClick={onOpenSnippet}
               className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
             >
-              Vedi Snippet
+              View Snippet
             </button>
           )}
           <button
@@ -354,7 +354,7 @@ export default function AgentCard({
             disabled={!agent.walletAddress}
             className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Fondi Agente
+            Fund Agent
           </button>
           {status === "active" ? (
             <button
@@ -362,7 +362,7 @@ export default function AgentCard({
               onClick={() => void handleRevoke()}
               className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20"
             >
-              Revoca
+              Revoke
             </button>
           ) : null}
         </div>
@@ -385,7 +385,7 @@ export default function AgentCard({
               id="activate-agent-title"
               className="text-lg font-semibold text-white"
             >
-              Attiva {displayName}
+              Activate {displayName}
             </h2>
             <ActivateModalBody
               agent={agent}
@@ -404,7 +404,7 @@ export default function AgentCard({
                 onClick={() => setActivateOpen(false)}
                 className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
               >
-                Annulla
+                Cancel
               </button>
               <ActivateConfirmButton
                 profile={agent.permissionProfile}
@@ -423,14 +423,14 @@ export default function AgentCard({
           onClick={() => void expandHistory()}
           className="text-sm font-medium text-[#6ee7b7] hover:underline"
         >
-          {historyOpen ? "Nascondi storico transazioni" : "Vedi storico transazioni"}
+          {historyOpen ? "Hide transaction history" : "View transaction history"}
         </button>
         {historyOpen ? (
           <div className="mt-3 max-h-52 space-y-2 overflow-y-auto rounded-lg border border-white/5 bg-black/20 p-2">
             {historyLoading ? (
-              <p className="text-xs text-slate-500">Caricamento…</p>
+              <p className="text-xs text-slate-500">Loading…</p>
             ) : sortedLogs.length === 0 ? (
-              <p className="text-xs text-slate-500">Nessun log.</p>
+              <p className="text-xs text-slate-500">No logs.</p>
             ) : (
               sortedLogs.map((log, idx) => (
                 <div
@@ -470,13 +470,13 @@ function profileBadge(profile: string): string {
 function profileLabel(profile: string): string {
   switch (profile) {
     case "readonly":
-      return "Read only";
+      return "Read Only";
     case "low_value":
-      return "Low value";
+      return "Low Value";
     case "custom":
-      return "Personalizzato";
+      return "Custom";
     case "full_access":
-      return "Full access";
+      return "Full Access";
     default:
       return profile;
   }
@@ -503,8 +503,8 @@ function ActivateModalBody({
     return (
       <div className="mt-4 space-y-3 text-sm leading-relaxed text-slate-300">
         <p>
-          Stai per attivare questo agente. Potrà monitorare dati on-chain ma non
-          potrà eseguire transazioni.
+          You are about to activate this agent. It can monitor on-chain data but cannot
+          execute transactions.
         </p>
       </div>
     );
@@ -514,19 +514,18 @@ function ActivateModalBody({
     return (
       <div className="mt-4 space-y-4 text-sm">
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-100">
-          Stai per abilitare questo agente a spendere autonomamente dal suo
-          wallet.
+          You are about to enable this agent to spend autonomously from its wallet.
         </p>
         <ul className="list-inside list-disc space-y-1 text-slate-300">
-          <li>Max per transazione: {caps.maxTxIota} IOTA</li>
-          <li>Max al giorno: {caps.maxDayIota} IOTA</li>
+          <li>Max per transaction: {caps.maxTxIota} IOTA</li>
+          <li>Max per day: {caps.maxDayIota} IOTA</li>
           <li>
-            Scadenza: {permitExpiryLabel === "Mai" ? "nessuna" : permitExpiryLabel}
+            Expiry: {permitExpiryLabel === "Never" ? "none" : permitExpiryLabel}
           </li>
         </ul>
         <p className="text-slate-400">
-          Una volta attivato, qualsiasi workflow collegato con lo snippet potrà
-          eseguire transazioni entro questi limiti.
+          Once active, any workflow connected via the snippet can execute transactions within
+          these limits.
         </p>
         <label className="flex cursor-pointer items-start gap-3 text-slate-200">
           <input
@@ -535,7 +534,7 @@ function ActivateModalBody({
             checked={activateConfirm}
             onChange={(e) => setActivateConfirm(e.target.checked)}
           />
-          <span>Confermo di voler attivare questo agente</span>
+          <span>I confirm I want to activate this agent</span>
         </label>
       </div>
     );
@@ -545,19 +544,19 @@ function ActivateModalBody({
     return (
       <div className="mt-4 space-y-4 text-sm">
         <p className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-2 font-medium text-red-200">
-          ATTENZIONE: stai per abilitare questo agente SENZA limiti di spesa.
+          WARNING: you are about to enable this agent with NO spending limits.
         </p>
         <ul className="list-inside list-disc space-y-1 text-slate-300">
           <li>
-            Max per transazione:{" "}
-            <span className="font-semibold text-red-300">Nessun limite</span>
+            Max per transaction:{" "}
+            <span className="font-semibold text-red-300">No limit</span>
           </li>
           <li>
-            Max al giorno:{" "}
-            <span className="font-semibold text-red-300">Nessun limite</span>
+            Max per day:{" "}
+            <span className="font-semibold text-red-300">No limit</span>
           </li>
           <li>
-            Scadenza: {permitExpiryLabel === "Mai" ? "nessuna" : permitExpiryLabel}
+            Expiry: {permitExpiryLabel === "Never" ? "none" : permitExpiryLabel}
           </li>
         </ul>
         <label className="flex cursor-pointer items-start gap-3 text-slate-200">
@@ -567,7 +566,7 @@ function ActivateModalBody({
             checked={activateConfirm}
             onChange={(e) => setActivateConfirm(e.target.checked)}
           />
-          <span>Confermo di voler attivare questo agente senza limiti di spesa</span>
+          <span>I confirm I want to activate this agent with no spending limits</span>
         </label>
       </div>
     );
@@ -576,13 +575,13 @@ function ActivateModalBody({
   return (
     <div className="mt-4 space-y-4 text-sm">
       <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-100">
-        Stai per abilitare questo agente con i limiti personalizzati sotto.
+        You are about to enable this agent with the custom limits below.
       </p>
       <ul className="list-inside list-disc space-y-1 text-slate-300">
-        <li>Max per transazione: {caps.maxTxIota} IOTA</li>
-        <li>Max al giorno: {caps.maxDayIota} IOTA</li>
+        <li>Max per transaction: {caps.maxTxIota} IOTA</li>
+        <li>Max per day: {caps.maxDayIota} IOTA</li>
         <li>
-          Scadenza: {permitExpiryLabel === "Mai" ? "nessuna" : permitExpiryLabel}
+          Expiry: {permitExpiryLabel === "Never" ? "none" : permitExpiryLabel}
         </li>
       </ul>
       <label className="flex cursor-pointer items-start gap-3 text-slate-200">
@@ -592,7 +591,7 @@ function ActivateModalBody({
           checked={activateConfirm}
           onChange={(e) => setActivateConfirm(e.target.checked)}
         />
-        <span>Confermo di voler attivare questo agente</span>
+        <span>I confirm I want to activate this agent</span>
       </label>
     </div>
   );
@@ -623,7 +622,7 @@ function ActivateConfirmButton({
         onClick={onClick}
         className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {activating ? "Attivazione…" : "Attiva"}
+        {activating ? "Activating…" : "Activate Agent"}
       </button>
     );
   }
@@ -636,7 +635,7 @@ function ActivateConfirmButton({
         onClick={onClick}
         className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {activating ? "Attivazione…" : "Attiva Agente"}
+        {activating ? "Activating…" : "Activate Agent"}
       </button>
     );
   }
@@ -648,7 +647,7 @@ function ActivateConfirmButton({
       onClick={onClick}
       className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8] disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {activating ? "Attivazione…" : "Attiva Agente"}
+      {activating ? "Activating…" : "Activate Agent"}
     </button>
   );
 }
@@ -657,20 +656,20 @@ function StatusBadge({ status }: { status: AgentStatus }) {
   if (status === "created" || status === "pending_activation") {
     return (
       <span className="inline-flex items-center rounded-full border border-amber-400/60 bg-amber-500/20 px-4 py-1.5 text-sm font-semibold text-amber-200 shadow-[0_0_20px_rgba(251,191,36,0.15)]">
-        Non attivato
+        Not activated
       </span>
     );
   }
   if (status === "active") {
     return (
       <span className="inline-flex items-center rounded-full border border-emerald-500/50 bg-emerald-500/15 px-4 py-1.5 text-sm font-semibold text-emerald-200">
-        Attivo
+        Active
       </span>
     );
   }
   return (
     <span className="inline-flex items-center rounded-full border border-red-500/50 bg-red-500/15 px-4 py-1.5 text-sm font-semibold text-red-200">
-      Revocato
+      Revoked
     </span>
   );
 }

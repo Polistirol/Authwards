@@ -199,7 +199,7 @@ export default function SnippetModal({
       setLoading(false);
       setData(null);
       setError(
-        "Sessione non disponibile (token mancante). Effettua di nuovo il login, poi riapri lo snippet.",
+        "Session unavailable (missing token). Sign in again, then reopen the snippet.",
       );
       return;
     }
@@ -229,7 +229,7 @@ export default function SnippetModal({
         setData(json as SnippetApiResponse);
       } catch (e: unknown) {
         if (e instanceof Error && e.name === "AbortError") return;
-        setError(e instanceof Error ? e.message : "Errore di rete");
+        setError(e instanceof Error ? e.message : "Network error");
       } finally {
         setLoading(false);
       }
@@ -288,10 +288,10 @@ export default function SnippetModal({
 
   const statusLabel =
     agentStatus === "active"
-      ? "Attivo"
+      ? "Active"
       : agentStatus === "revoked"
-        ? "Revocato"
-        : "Non attivato";
+        ? "Revoked"
+        : "Not activated";
 
   const handleDownload = () => {
     if (!data || !currentProvider) return;
@@ -331,21 +331,21 @@ export default function SnippetModal({
               id="snippet-modal-title"
               className="text-xl font-semibold text-white"
             >
-              Snippet workflow
+              Workflow snippet
             </h2>
             <button
               type="button"
               onClick={onClose}
               className="rounded-lg border border-[#2a2d3a] px-3 py-1 text-sm text-slate-400 hover:bg-white/5"
             >
-              Chiudi
+              Close
             </button>
           </div>
 
           {pending ? (
             <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-              Questo agente non è ancora attivo. Attivalo dalla dashboard con il
-              bottone «Attiva Agente»; poi collega il workflow con i file sotto.
+              This agent is not yet activated. Activate it from the dashboard with
+              &quot;Activate Agent&quot;; then connect your workflow using the files below.
             </div>
           ) : null}
 
@@ -359,13 +359,13 @@ export default function SnippetModal({
                   onClick={() => void copyText("did", agentDid)}
                   className="text-xs text-[#6ee7b7] underline"
                 >
-                  {copyMain === "did" ? "Copiato ✓" : "Copia"}
+                  {copyMain === "did" ? "Copied ✓" : "Copy"}
                 </button>
               </div>
             </div>
             {data?.agentName ? (
               <div>
-                <p className="text-xs uppercase text-slate-500">Nome agente</p>
+                <p className="text-xs uppercase text-slate-500">Agent name</p>
                 <p className="mt-1 text-sm font-medium text-white">{data.agentName}</p>
               </div>
             ) : null}
@@ -385,19 +385,19 @@ export default function SnippetModal({
                 <button
                   type="button"
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
-                  title={tokenRevealed ? "Nascondi token" : "Mostra token"}
+                  title={tokenRevealed ? "Hide token" : "Show token"}
                   onClick={() => setTokenRevealed((v) => !v)}
                 >
                   {tokenRevealed ? <IconEyeOff /> : <IconEye />}
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-slate-500">
-                Nell’anteprima il token è mascherato; scarica e copia dal blocco sotto usano il token
-                reale.
+                The token is masked in the preview; download and copy from the block below use the
+                real token.
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase text-slate-500">Stato</p>
+              <p className="text-xs uppercase text-slate-500">Status</p>
               <p className="mt-1 text-sm font-medium text-white">{statusLabel}</p>
             </div>
           </div>
@@ -405,7 +405,7 @@ export default function SnippetModal({
 
         <div className="p-6 pt-2">
           {loading ? (
-            <p className="text-sm text-slate-400">Caricamento snippet…</p>
+            <p className="text-sm text-slate-400">Loading snippet…</p>
           ) : error ? (
             <p className="text-sm text-red-400">{error}</p>
           ) : data && currentProvider ? (
@@ -435,17 +435,26 @@ export default function SnippetModal({
                   {currentProvider.description}
                 </p>
 
+                {tab === "n8n" ? (
+                  <div className="mt-4 space-y-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-50">
+                    <p className="font-medium">Download n8n Workflow</p>
+                    <p>
+                      Download the JSON file, then in n8n click <strong>Import</strong> and select the
+                      file to add the workflow.
+                    </p>
+                  </div>
+                ) : null}
                 {tab === "arduino" ? (
                   <div className="mt-4 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
                     <p className="font-medium">Hardware</p>
                     <p>
-                      Richiede ESP32 o ESP8266 con WiFi. Modifica{" "}
-                      <code className="rounded bg-black/30 px-1">WIFI_SSID</code> e{" "}
-                      <code className="rounded bg-black/30 px-1">WIFI_PASS</code> con le
-                      tue credenziali.
+                      Requires ESP32 or ESP8266 with WiFi. Set{" "}
+                      <code className="rounded bg-black/30 px-1">WIFI_SSID</code> and{" "}
+                      <code className="rounded bg-black/30 px-1">WIFI_PASS</code> to your
+                      credentials.
                     </p>
                     <p className="text-amber-100/90">
-                      Librerie: <strong>WiFi</strong>, <strong>HTTPClient</strong>,{" "}
+                      Required libraries: <strong>WiFi</strong>, <strong>HTTPClient</strong>,{" "}
                       <strong>ArduinoJson</strong>
                     </p>
                   </div>
@@ -456,7 +465,7 @@ export default function SnippetModal({
                     <button
                       type="button"
                       className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
-                      title={tokenRevealed ? "Nascondi token nel codice" : "Mostra token nel codice"}
+                      title={tokenRevealed ? "Hide token in code" : "Show token in code"}
                       onClick={() => setTokenRevealed((v) => !v)}
                     >
                       {tokenRevealed ? <IconEyeOff /> : <IconEye />}
@@ -468,7 +477,7 @@ export default function SnippetModal({
                       type="button"
                       onClick={handleDownload}
                       className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#6ee7b7]/40 bg-[#6ee7b7]/10 text-[#6ee7b7] hover:bg-[#6ee7b7]/20"
-                      title="Scarica file"
+                      title="Download file"
                     >
                       <IconDownload />
                     </button>
@@ -476,7 +485,7 @@ export default function SnippetModal({
                       type="button"
                       onClick={() => void copyText(copyKey, downloadCode)}
                       className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
-                      title={copyMain === copyKey ? "Copiato" : "Copia negli appunti"}
+                      title={copyMain === copyKey ? "Copied" : "Copy code"}
                     >
                       {copyMain === copyKey ? (
                         <IconCheck className="h-5 w-5 text-[#6ee7b7]" />
@@ -490,8 +499,8 @@ export default function SnippetModal({
             </>
           ) : data ? (
             <p className="text-sm text-amber-200">
-              Contenuto snippet non disponibile. Verifica che il backend esponga il campo
-              «providers».
+              Snippet content unavailable. Ensure the backend exposes the &quot;providers&quot;
+              field.
             </p>
           ) : null}
         </div>

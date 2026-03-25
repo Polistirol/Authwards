@@ -261,7 +261,7 @@ export function WelcomeModal(): ReactElement | null {
             borderLeftColor: "#fbbf24",
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#ffffff" }}>Your recovery phrase</h2>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#ffffff" }}>Your recovery key</h2>
 
           <div
             style={{
@@ -277,7 +277,7 @@ export function WelcomeModal(): ReactElement | null {
               ⚠
             </span>
             <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#cbd5e1" }}>
-              This is the only time you will see this phrase. Store it somewhere safe. With it you can
+              This is the only time you will see this key. Save it in a secure place. Use this key to
               import your wallet into the official IOTA wallet and use it anywhere.
             </p>
           </div>
@@ -351,7 +351,7 @@ export function WelcomeModal(): ReactElement | null {
                 accentColor: ACCENT,
               }}
             />
-            <span>I have saved my recovery phrase somewhere safe</span>
+            <span>I have saved my recovery key</span>
           </label>
 
           <button
@@ -371,7 +371,7 @@ export function WelcomeModal(): ReactElement | null {
               cursor: savedConfirm ? "pointer" : "not-allowed",
             }}
           >
-            Start using IOTA
+            Get started
           </button>
         </footer>
       </div>

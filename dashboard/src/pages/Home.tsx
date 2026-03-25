@@ -16,7 +16,7 @@ export default function Home() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0b0f] text-[#e2e4ed]">
-        <p className="text-sm opacity-70">Caricamento…</p>
+        <p className="text-sm opacity-70">Loading…</p>
       </div>
     );
   }
@@ -35,15 +35,15 @@ export default function Home() {
             IOTA Auth Layer
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#a8abb8]">
-            La tua identità Google diventa un DID su IOTA. Delega agenti autonomi
-            con permessi verificabili on-chain.
+            Your Google identity becomes an IOTA DID. Delegate autonomous agents with
+            verifiable on-chain permissions.
           </p>
           <button
             type="button"
             onClick={() => login()}
             className="mt-10 rounded-xl bg-[#6ee7b7] px-8 py-3.5 text-base font-semibold text-[#0a0b0f] shadow-[0_0_32px_rgba(110,231,183,0.25)] transition hover:bg-[#5dd9a8]"
           >
-            Accedi
+            Sign in
           </button>
         </section>
 
@@ -52,9 +52,9 @@ export default function Home() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
               <GoogleGlyph />
             </div>
-            <h2 className="text-lg font-semibold text-white">Login con Google</h2>
+            <h2 className="text-lg font-semibold text-white">Sign in with Google</h2>
             <p className="mt-2 text-sm leading-relaxed text-[#a8abb8]">
-              Autenticazione OAuth sicura; nessun seed da gestire sul dispositivo.
+              Secure OAuth authentication; no seed to manage on the device.
             </p>
           </article>
 
@@ -62,10 +62,9 @@ export default function Home() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
               <FingerprintIcon />
             </div>
-            <h2 className="text-lg font-semibold text-white">DID su IOTA</h2>
+            <h2 className="text-lg font-semibold text-white">DID on IOTA</h2>
             <p className="mt-2 text-sm leading-relaxed text-[#a8abb8]">
-              Identità self-sovereign su Tangle: DID document pubblico e
-              verificabile.
+              Self-sovereign identity on the Tangle: public, verifiable DID document.
             </p>
           </article>
 
@@ -73,9 +72,9 @@ export default function Home() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
               <BotIcon />
             </div>
-            <h2 className="text-lg font-semibold text-white">Agenti delegati</h2>
+            <h2 className="text-lg font-semibold text-white">Delegated agents</h2>
             <p className="mt-2 text-sm leading-relaxed text-[#a8abb8]">
-              Crea agenti con profili di permesso e traccia ogni azione on-chain.
+              Create agents with permission profiles and track every action on-chain.
             </p>
           </article>
         </section>

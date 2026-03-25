@@ -12,17 +12,17 @@ function shipmentStatusBadge(status: string): { cls: string; label: string } {
     case "in_transit":
       return {
         cls: "border-amber-500/60 bg-amber-500/15 text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.25)]",
-        label: "In Transito",
+        label: "In Transit",
       };
     case "delivered":
       return {
         cls: "border-emerald-500/50 bg-emerald-500/15 text-emerald-200",
-        label: "Consegnata",
+        label: "Delivered",
       };
     case "payment_released":
       return {
         cls: "border-blue-500/50 bg-blue-500/15 text-blue-200",
-        label: "Pagamento Rilasciato",
+        label: "Payment Released",
       };
     default:
       return {
@@ -73,10 +73,10 @@ export function ShipmentCard({ shipment, agent }: ShipmentCardProps) {
           <span className="text-slate-300">{shipment.destination}</span>
         </p>
         <p className="mt-3 text-sm text-slate-400">
-          Importo: <span className="font-medium text-white">{shipment.paymentAmount} IOTA</span>
+          Payment amount: <span className="font-medium text-white">{shipment.paymentAmount} IOTA</span>
         </p>
         <p className="mt-1 text-sm text-slate-400">
-          Fornitore:{" "}
+          Supplier:{" "}
           <span className="font-mono text-xs text-slate-300">{truncateDid(shipment.supplier)}</span>
         </p>
 
@@ -87,7 +87,7 @@ export function ShipmentCard({ shipment, agent }: ShipmentCardProps) {
               onClick={() => setSetupOpen(true)}
               className="rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-amber-500/20"
             >
-              Crea Agente di Pagamento
+              Create Payment Agent
             </button>
           </div>
         ) : null}

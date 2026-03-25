@@ -47,7 +47,7 @@ export default function TrustChain({
     <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
       <h2 className="text-lg font-semibold text-white">Trust chain</h2>
       <p className="mt-1 text-sm text-slate-500">
-        Flusso di fiducia dalla tua identità Google alle transazioni delegate.
+        Trust flow from your Google identity to delegated transactions.
       </p>
 
       <div className="mt-8 overflow-x-auto pb-2">
@@ -59,10 +59,10 @@ export default function TrustChain({
               </p>
               <p className="mt-1 text-sm font-medium text-white">{userName}</p>
             </Node>
-            <Arrow label="autentica" />
+            <Arrow label="authenticates" />
             <Node>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                DID utente
+                User DID
               </p>
               <p
                 className="mt-1 max-w-[220px] break-all font-mono text-xs text-[#6ee7b7]"
@@ -75,7 +75,7 @@ export default function TrustChain({
 
           {agents.length === 0 ? (
             <p className="text-sm text-slate-500">
-              Nessun agente: aggiungi un agente per vedere la delega nella catena.
+              No delegates yet: add an agent to see delegation in the chain.
             </p>
           ) : (
             <div className="flex flex-wrap items-start gap-x-4 gap-y-8 pl-0 md:pl-24">
@@ -84,10 +84,10 @@ export default function TrustChain({
                   key={agent.agentDid}
                   className="flex flex-wrap items-center gap-2"
                 >
-                  <Arrow label="delega" />
+                  <Arrow label="delegates" />
                   <Node>
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      DID agente
+                      Agent DID
                     </p>
                     <p
                       className="mt-1 max-w-[200px] break-all font-mono text-xs text-[#e2e4ed]"
@@ -96,13 +96,13 @@ export default function TrustChain({
                       {truncate(agent.agentDid, 36)}
                     </p>
                   </Node>
-                  <Arrow label="esegue" />
+                  <Arrow label="executes" />
                   <Node>
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Transazione
+                      Transaction
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      Operazioni on-chain autorizzate dal profilo permessi.
+                      On-chain operations authorized by the permission profile.
                     </p>
                   </Node>
                 </div>

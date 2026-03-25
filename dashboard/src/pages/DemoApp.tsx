@@ -12,8 +12,8 @@ function App() {
 
 function MyDapp() {
   const { user, did, isAuthenticated, login, logout } = useIotaAuth();
-  if (!isAuthenticated) return <button onClick={login}>Accedi</button>;
-  return <p>Benvenuto, {user?.name} — {did}</p>;
+  if (!isAuthenticated) return <button onClick={login}>Sign in</button>;
+  return <p>Welcome, {user?.name} — {did}</p>;
 }`;
 
 export default function DemoApp() {
@@ -34,38 +34,38 @@ export default function DemoApp() {
 
       <main className="mx-auto max-w-3xl px-6 py-14">
         {loading ? (
-          <p className="text-slate-400">Caricamento…</p>
+          <p className="text-slate-400">Loading…</p>
         ) : !isAuthenticated ? (
           <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-10 text-center shadow-xl">
             <p className="text-lg text-slate-200">
-              Per usare questa dApp, accedi con IOTA Auth
+              To use this dApp, sign in with IOTA Auth
             </p>
             <button
               type="button"
               onClick={() => login()}
               className="mt-8 rounded-xl bg-[#60a5fa] px-8 py-3 font-semibold text-[#0f172a] shadow-[0_0_24px_rgba(96,165,250,0.35)] transition hover:bg-[#93c5fd]"
             >
-              Accedi con IOTA Auth
+              Sign in with IOTA Auth
             </button>
           </div>
         ) : (
           <div className="space-y-8">
             <div className="rounded-2xl border border-[#60a5fa]/30 bg-[#0f172a] p-8 shadow-lg">
               <p className="text-xl font-semibold text-white">
-                Benvenuto! La tua identità:{" "}
+                Welcome! Your identity:{" "}
                 <code className="break-all text-base font-normal text-[#60a5fa]">
                   {did ?? ""}
                 </code>
               </p>
               <p className="mt-4 leading-relaxed text-slate-400">
-                Questa dApp è alimentata da IOTA Auth SDK. Lo sviluppatore ha
-                integrato l&apos;autenticazione con poche righe di codice.
+                This dApp is powered by the IOTA Auth SDK. The developer integrated
+                authentication in just a few lines of code.
               </p>
             </div>
 
             <div>
               <p className="mb-3 text-sm font-medium text-slate-500">
-                Integrazione tipica
+                Typical integration
               </p>
               <pre className="overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-5 font-mono text-sm leading-relaxed text-slate-300">
                 <code>{CODE_SNIPPET}</code>
@@ -74,7 +74,7 @@ export default function DemoApp() {
 
             {user ? (
               <p className="text-center text-sm text-slate-500">
-                Sessione attiva come {user.email ?? user.providerId}
+                Signed in as {user.email ?? user.providerId}
               </p>
             ) : null}
           </div>
