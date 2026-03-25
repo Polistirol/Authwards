@@ -1,5 +1,7 @@
 import "./envBootstrap.js";
 
+import fs from "node:fs";
+
 import cors from "cors";
 import express from "express";
 import passport from "passport";
@@ -16,6 +18,7 @@ import adminRouter from "./routes/admin.js";
 import bridgeRouter from "./routes/bridge.js";
 import shipmentsRouter from "./routes/shipments.js";
 import { requestLogMiddleware } from "./requestLog.js";
+import { DB_INIT_PATH, DB_PATH } from "./paths.js";
 
 const app = express();
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
@@ -68,6 +71,9 @@ function mergeDbInitOnStartEnabled(): boolean {
 
 async function main() {
   await ensureDbFile();
+  console.log(
+    `[db] DB_PATH=${DB_PATH} | init=${DB_INIT_PATH} (${fs.existsSync(DB_INIT_PATH) ? "found" : "MISSING — will use empty DB on first run"})`,
+  );
   if (mergeDbInitOnStartEnabled()) {
     try {
       const r = await mergeDbInitIntoExisting();
