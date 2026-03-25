@@ -24,7 +24,7 @@ function getJwtSecret(): string {
 }
 
 function buildWalletLoginMessage(nonce: string): string {
-  return `Sign this message to login to IOTA Auth: ${nonce}`;
+  return `Sign this message to login to Authwards: ${nonce}`;
 }
 
 function toPublicUser(u: DbUser) {
@@ -189,10 +189,10 @@ function escapeHtml(s: string): string {
 }
 
 function htmlTelegramSuccess(token: string): string {
-  const payload = JSON.stringify({ type: "iota-auth-token", token });
+  const payload = JSON.stringify({ type: "authwards-token", token });
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IOTA Auth</title></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Authwards</title></head>
 <body style="margin:0;background:#0b0c0f;color:#a1a1aa;font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;">
 <p style="margin:0;font-size:0.9rem;">Sign-in complete. This window will close…</p>
 <script>
@@ -211,7 +211,7 @@ function htmlTelegramSuccess(token: string): string {
 }
 
 function htmlTelegramError(message: string, _httpStatus: number): string {
-  const payload = JSON.stringify({ type: "iota-auth-error", error: message });
+  const payload = JSON.stringify({ type: "authwards-error", error: message });
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Error</title></head>
@@ -337,7 +337,7 @@ router.get("/telegram/login", async (_req, res) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>IOTA Auth — Telegram</title>
+  <title>Authwards — Telegram</title>
   <style>
     body { margin:0; min-height:100vh; background:#0b0c0f; color:#e8eaef; font-family:system-ui,sans-serif;
       display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; box-sizing:border-box; }
@@ -346,7 +346,7 @@ router.get("/telegram/login", async (_req, res) => {
   </style>
 </head>
 <body>
-  <p class="logo">IOTA Auth</p>
+  <p class="logo">Authwards</p>
   <p class="sub">Sign in with your Telegram account</p>
   <div id="tg-widget"></div>
   <script>

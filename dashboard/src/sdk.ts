@@ -1,8 +1,8 @@
 export {
-  IotaAuthProvider,
+  AuthwardsProvider,
   LoginModal,
   useAgent,
-  useIotaAuth,
+  useAuthwards,
 } from "../../sdk";
 
 export type {
@@ -11,6 +11,13 @@ export type {
   AgentStatus,
   CreateAgentInput,
   CreateAgentResult,
-  IotaAuthConfig,
+  AuthwardsConfig,
   User,
 } from "../../sdk";
+
+/** @deprecated Use `AuthwardsProvider`. */
+export { AuthwardsProvider as IotaAuthProvider } from "../../sdk";
+/** @deprecated Use `useAuthwards`. */
+export { useAuthwards as useIotaAuth } from "../../sdk";
+/** @deprecated Use `AuthwardsConfig`. */
+export type { AuthwardsConfig as IotaAuthConfig } from "../../sdk";

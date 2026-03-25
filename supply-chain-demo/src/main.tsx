@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
-import { IotaAuthProvider } from "../../sdk";
+import { AuthwardsProvider } from "../../sdk";
 import App from "./App";
 import "./index.css";
 
@@ -14,9 +14,9 @@ if (!root) throw new Error("Root element missing");
 createRoot(root).render(
   <StrictMode>
     <BrowserRouter>
-      <IotaAuthProvider backendUrl={backendUrl} telegramLoginEnabled>
+      <AuthwardsProvider backendUrl={backendUrl} telegramLoginEnabled>
         <App />
-      </IotaAuthProvider>
+      </AuthwardsProvider>
     </BrowserRouter>
   </StrictMode>,
 );

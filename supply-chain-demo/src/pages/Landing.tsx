@@ -1,10 +1,10 @@
 import { Navigate } from "react-router-dom";
 
-import { ConnectButton, useIotaAuth } from "../../../sdk";
+import { ConnectButton, useAuthwards } from "../../../sdk";
 import { TraceFlowFooter, TraceFlowHeader, TraceFlowShell } from "../components/TraceFlowLayout";
 
 export function Landing() {
-  const { user, loading } = useIotaAuth();
+  const { user, loading } = useAuthwards();
 
   if (loading) {
     return (

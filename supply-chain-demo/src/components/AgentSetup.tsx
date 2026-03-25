@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import type { CreateAgentResult } from "../../../sdk";
-import { useAgent, useIotaAuth } from "../../../sdk";
+import { useAgent, useAuthwards } from "../../../sdk";
 import { truncateDid } from "../lib/format";
 import type { Shipment } from "../lib/shipmentsApi";
 import SnippetModal from "./SnippetModal";
@@ -16,7 +16,7 @@ type ProfileChoice = "low_value" | "full_access";
 
 export function AgentSetup({ shipment, open, onClose }: AgentSetupProps) {
   const { createAgent } = useAgent();
-  const { token, backendUrl } = useIotaAuth();
+  const { token, backendUrl } = useAuthwards();
   const [profile, setProfile] = useState<ProfileChoice>("low_value");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

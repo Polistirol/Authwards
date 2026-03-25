@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Link, useParams } from "react-router-dom";
 
 import type { Agent, AgentLog, AgentStatus } from "../../../sdk";
-import { ConnectButton, useAgent, useIotaAuth } from "../../../sdk";
+import { ConnectButton, useAgent, useAuthwards } from "../../../sdk";
 import { findAgentForShipment } from "../lib/agents";
 import { explorerDidUrl, explorerObjectUrl, explorerTxUrl } from "../lib/explorer";
 import { truncateDid } from "../lib/format";
@@ -46,7 +46,7 @@ function findPaymentLog(logs: AgentLog[]): AgentLog | undefined {
 export function ShipmentDetail() {
   const { id: rawId } = useParams();
   const id = rawId ? decodeURIComponent(rawId) : "";
-  const { user, token, backendUrl } = useIotaAuth();
+  const { user, token, backendUrl } = useAuthwards();
   const { agents, fetchAgentLogs, agentLogs, refreshAgents } = useAgent();
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [err, setErr] = useState<string | null>(null);

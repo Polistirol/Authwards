@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { useIotaAuth } from "./useIotaAuth";
+import { useAuthwards } from "./useAuthwards";
 import { useWallet } from "./useWallet";
 import type { AuthProviderType, User } from "./types";
 
@@ -29,14 +29,14 @@ export type ConnectButtonProps = {
   dashboardUrl?: string;
   /**
    * Same as `dashboardUrl` (preferred if you set `FRONTEND_URL` in .env).
-   * On open, `?token=` (JWT) is appended so the dashboard uses an already-authenticated `IotaAuthProvider`.
+   * On open, `?token=` (JWT) is appended so the dashboard uses an already-authenticated `AuthwardsProvider`.
    */
   frontendUrl?: string;
   showBalance?: boolean;
   /** After a real login (not when restoring session). */
   onConnect?: (user: User) => void;
   onDisconnect?: () => void;
-  /** “Powered by IOTA Auth” link in the menu footer. */
+  /** “Powered by Authwards” link in the menu footer. */
   landingUrl?: string;
 };
 
@@ -92,7 +92,7 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** Matches `IotaAuthProvider` bootstrap (`?token=` → session on the target). */
+/** Matches `AuthwardsProvider` bootstrap (`?token=` → session on the target). */
 function appendSessionTokenToUrl(href: string, jwt: string | null): string {
   if (!jwt?.trim()) return href;
   try {
@@ -180,7 +180,7 @@ export function ConnectButton({
     login,
     logout,
     token,
-  } = useIotaAuth();
+  } = useAuthwards();
   const { loading: balanceLoading, balance, getBalance } = useWallet();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -715,10 +715,10 @@ export function ConnectButton({
               rel="noopener noreferrer"
               style={{ fontSize: 10, color: palette.muted, textDecoration: "none" }}
             >
-              Powered by IOTA Auth
+              Powered by Authwards
             </a>
           ) : (
-            <span style={{ fontSize: 10, color: palette.muted }}>Powered by IOTA Auth</span>
+            <span style={{ fontSize: 10, color: palette.muted }}>Powered by Authwards</span>
           )}
         </div>
       </div>

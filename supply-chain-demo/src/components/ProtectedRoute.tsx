@@ -1,10 +1,10 @@
 import type { ReactElement } from "react";
 import { Navigate } from "react-router-dom";
 
-import { useIotaAuth } from "../../../sdk";
+import { useAuthwards } from "../../../sdk";
 
 export function ProtectedRoute({ children }: { children: ReactElement }) {
-  const { user, loading } = useIotaAuth();
+  const { user, loading } = useAuthwards();
 
   if (loading) {
     return (

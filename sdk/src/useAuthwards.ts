@@ -1,9 +1,9 @@
 import { useContext, useMemo } from "react";
 
-import { IotaAuthContext } from "./IotaAuthContext";
+import { AuthwardsContext } from "./AuthwardsContext";
 import type { AuthProviderType, User } from "./types";
 
-export type UseIotaAuthResult = {
+export type UseAuthwardsResult = {
   user: User | null;
   did: string | undefined;
   walletAddress: string | undefined;
@@ -33,10 +33,10 @@ export type UseIotaAuthResult = {
   iotaWalletDownloadUrl: string;
 };
 
-export function useIotaAuth(): UseIotaAuthResult {
-  const ctx = useContext(IotaAuthContext);
+export function useAuthwards(): UseAuthwardsResult {
+  const ctx = useContext(AuthwardsContext);
   if (!ctx) {
-    throw new Error("useIotaAuth must be used within IotaAuthProvider");
+    throw new Error("useAuthwards must be used within AuthwardsProvider");
   }
 
   const {

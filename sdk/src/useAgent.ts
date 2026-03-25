@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 
 import { normalizeAgentLogList } from "./agentLogUtils";
-import { IotaAuthContext } from "./IotaAuthContext";
+import { AuthwardsContext } from "./AuthwardsContext";
 import type { Agent, AgentLog } from "./types";
 
 function trimTrailingSlash(url: string): string {
@@ -51,9 +51,9 @@ export type UseAgentResult = {
 };
 
 export function useAgent(): UseAgentResult {
-  const ctx = useContext(IotaAuthContext);
+  const ctx = useContext(AuthwardsContext);
   if (!ctx) {
-    throw new Error("useAgent must be used within IotaAuthProvider");
+    throw new Error("useAgent must be used within AuthwardsProvider");
   }
 
   const { backendUrl, token } = ctx;
@@ -79,7 +79,7 @@ export function useAgent(): UseAgentResult {
           headers: authHeaders(),
         });
         if (!res.ok) {
-          console.error("[@iota-auth/sdk] GET /agent/list failed:", res.status, await res.text());
+          console.error("[@authwards/sdk] GET /agent/list failed:", res.status, await res.text());
           setAgents([]);
           return;
         }
@@ -90,7 +90,7 @@ export function useAgent(): UseAgentResult {
         }
         setAgents(data as Agent[]);
       } catch (e) {
-        console.error("[@iota-auth/sdk] GET /agent/list error:", e);
+        console.error("[@authwards/sdk] GET /agent/list error:", e);
         setAgents([]);
       } finally {
         if (!silent) setLoading(false);
@@ -132,14 +132,14 @@ export function useAgent(): UseAgentResult {
           { headers: authHeaders() },
         );
         if (!res.ok) {
-          console.error("[@iota-auth/sdk] GET /agent/logs failed:", res.status, await res.text());
+          console.error("[@authwards/sdk] GET /agent/logs failed:", res.status, await res.text());
           return;
         }
         const raw: unknown = await res.json();
         const normalized = normalizeAgentLogList(raw);
         setLogsReplace(agentDid, normalized);
       } catch (e) {
-        console.error("[@iota-auth/sdk] GET /agent/logs error:", e);
+        console.error("[@authwards/sdk] GET /agent/logs error:", e);
       }
     },
     [backendUrl, token, authHeaders, setLogsReplace],
@@ -148,7 +148,7 @@ export function useAgent(): UseAgentResult {
   const createAgent = useCallback(
     async (input: CreateAgentInput): Promise<CreateAgentResult | null> => {
       if (!token) {
-        console.error("[@iota-auth/sdk] createAgent: not authenticated");
+        console.error("[@authwards/sdk] createAgent: not authenticated");
         return null;
       }
       try {
@@ -178,14 +178,14 @@ export function useAgent(): UseAgentResult {
           body: JSON.stringify(body),
         });
         if (!res.ok) {
-          console.error("[@iota-auth/sdk] POST /agent/create failed:", res.status, await res.text());
+          console.error("[@authwards/sdk] POST /agent/create failed:", res.status, await res.text());
           return null;
         }
         const json = (await res.json()) as CreateAgentResult;
         await loadAgents(true);
         return json;
       } catch (e) {
-        console.error("[@iota-auth/sdk] POST /agent/create error:", e);
+        console.error("[@authwards/sdk] POST /agent/create error:", e);
         return null;
       }
     },
@@ -202,13 +202,13 @@ export function useAgent(): UseAgentResult {
           body: JSON.stringify({ agentDid }),
         });
         if (!res.ok) {
-          console.error("[@iota-auth/sdk] POST /bridge/revoke failed:", res.status, await res.text());
+          console.error("[@authwards/sdk] POST /bridge/revoke failed:", res.status, await res.text());
           return false;
         }
         await loadAgents(true);
         return true;
       } catch (e) {
-        console.error("[@iota-auth/sdk] POST /bridge/revoke error:", e);
+        console.error("[@authwards/sdk] POST /bridge/revoke error:", e);
         return false;
       }
     },

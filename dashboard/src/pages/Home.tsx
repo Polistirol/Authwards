@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useIotaAuth } from "../sdk";
+import { useAuthwards } from "../sdk";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isAuthenticated, loading, login } = useIotaAuth();
+  const { isAuthenticated, loading, login } = useAuthwards();
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -25,14 +25,14 @@ export default function Home() {
     <div className="min-h-screen bg-[#0a0b0f] text-[#e2e4ed]">
       <header className="border-b border-white/5 px-6 py-4">
         <span className="text-sm font-semibold tracking-wide text-[#6ee7b7]">
-          IOTA Auth
+          Authwards
         </span>
       </header>
 
       <main className="mx-auto max-w-5xl px-6 pb-24 pt-16">
         <section className="text-center">
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
-            IOTA Auth Layer
+            Authwards
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#a8abb8]">
             Your Google identity becomes an IOTA DID. Delegate autonomous agents with

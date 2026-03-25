@@ -1,11 +1,11 @@
-export { IotaAuthProvider } from "./src/IotaAuthProvider";
-export type { IotaAuthProviderProps } from "./src/IotaAuthProvider";
+export { AuthwardsProvider } from "./src/AuthwardsProvider";
+export type { AuthwardsProviderProps } from "./src/AuthwardsProvider";
 
-export { IotaAuthContext } from "./src/IotaAuthContext";
-export type { IotaAuthContextValue } from "./src/IotaAuthContext";
+export { AuthwardsContext } from "./src/AuthwardsContext";
+export type { AuthwardsContextValue } from "./src/AuthwardsContext";
 
-export { useIotaAuth } from "./src/useIotaAuth";
-export type { UseIotaAuthResult } from "./src/useIotaAuth";
+export { useAuthwards } from "./src/useAuthwards";
+export type { UseAuthwardsResult } from "./src/useAuthwards";
 
 export { useWallet } from "./src/useWallet";
 export type { UseWalletResult, WalletBalanceResponse } from "./src/useWallet";
@@ -23,10 +23,25 @@ export type { ConnectButtonProps } from "./src/ConnectButton";
 
 export type {
   AuthProviderType,
-  IotaAuthConfig,
+  AuthwardsConfig,
   User,
   Agent,
   AgentLog,
   AgentStatus,
   AgentTaskConfig,
 } from "./src/types";
+
+/** @deprecated Use `AuthwardsProvider`. */
+export { AuthwardsProvider as IotaAuthProvider } from "./src/AuthwardsProvider";
+/** @deprecated Use `AuthwardsProviderProps`. */
+export type { AuthwardsProviderProps as IotaAuthProviderProps } from "./src/AuthwardsProvider";
+
+/** @deprecated Use `AuthwardsContext`. */
+export { AuthwardsContext as IotaAuthContext } from "./src/AuthwardsContext";
+/** @deprecated Use `AuthwardsContextValue`. */
+export type { AuthwardsContextValue as IotaAuthContextValue } from "./src/AuthwardsContext";
+
+/** @deprecated Use `useAuthwards`. */
+export { useAuthwards as useIotaAuth } from "./src/useAuthwards";
+/** @deprecated Use `UseAuthwardsResult`. */
+export type { UseAuthwardsResult as UseIotaAuthResult } from "./src/useAuthwards";

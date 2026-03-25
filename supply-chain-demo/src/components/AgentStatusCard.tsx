@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { Agent, AgentStatus } from "../../../sdk";
-import { useAgent, useIotaAuth, useWallet } from "../../../sdk";
+import { useAgent, useAuthwards, useWallet } from "../../../sdk";
 import { explorerObjectUrl } from "../lib/explorer";
 import { nanosToIota, truncateDid } from "../lib/format";
 import { permissionCaps } from "../lib/permissions";
@@ -45,7 +45,7 @@ export type AgentStatusCardProps = {
 };
 
 export function AgentStatusCard({ agent }: AgentStatusCardProps) {
-  const { backendUrl, token } = useIotaAuth();
+  const { backendUrl, token } = useAuthwards();
   const { refreshAgents } = useAgent();
   const { getBalance, transferToAgent, loading: walletLoading } = useWallet();
   const [balanceNanos, setBalanceNanos] = useState<string | null>(null);

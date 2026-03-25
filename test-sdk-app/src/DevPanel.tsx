@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import type { Agent } from "../../sdk";
-import { ConnectButton, useAgent, useIotaAuth } from "../../sdk";
+import { ConnectButton, useAgent, useAuthwards } from "../../sdk";
 
-const SESSION_KEY = "iota-auth:jwt";
+function readSessionJwt(): string | null {
+  try {
+    return (
+      sessionStorage.getItem("authwards:jwt") ?? sessionStorage.getItem("iota-auth:jwt")
+    );
+  } catch {
+    return null;
+  }
+}
 
 const C = {
   bg: "#0f1117",
@@ -105,7 +113,7 @@ function IntegrationSnippet(): ReactElement {
       <span style={cmt}>// 1. Wrap your app</span>
       {"\n"}
       <span style={punct}>&lt;</span>
-      <span style={kw}>IotaAuthProvider</span> <span style={fn}>backendUrl</span>
+      <span style={kw}>AuthwardsProvider</span> <span style={fn}>backendUrl</span>
       <span style={punct}>=</span>
       <span style={str}>&quot;http://localhost:3000&quot;</span>
       <span style={punct}>&gt;</span>
@@ -114,7 +122,7 @@ function IntegrationSnippet(): ReactElement {
       <span style={kw}>App</span> <span style={punct}>/&gt;</span>
       {"\n"}
       <span style={punct}>&lt;/</span>
-      <span style={kw}>IotaAuthProvider</span>
+      <span style={kw}>AuthwardsProvider</span>
       <span style={punct}>&gt;</span>
       {"\n"}
       <span style={cmt}>// 2. Use the hooks</span>
@@ -122,7 +130,7 @@ function IntegrationSnippet(): ReactElement {
       <span style={kw}>const</span> {"{ "}
       <span style={fn}>user</span>, <span style={fn}>did</span>, <span style={fn}>isAuthenticated</span>,{" "}
       <span style={fn}>login</span>, <span style={fn}>logout</span>
-      {" } "} <span style={punct}>=</span> <span style={fn}>useIotaAuth</span>
+      {" } "} <span style={punct}>=</span> <span style={fn}>useAuthwards</span>
       <span style={punct}>()</span>
       {"\n"}
       <span style={kw}>const</span> {"{ "}
@@ -155,7 +163,7 @@ export type DevPanelProps = {
 export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
   const base = useMemo(() => trimTrailingSlash(backendUrl), [backendUrl]);
 
-  const { user, isAuthenticated, loading, login, logout } = useIotaAuth();
+  const { user, isAuthenticated, loading, login, logout } = useAuthwards();
   const { agents, loading: agentsLoading, createAgent, agentLogs, fetchAgentLogs } =
     useAgent();
 
@@ -240,7 +248,7 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
 
   const handleLogin = () => {
     try {
-      pushLog("info", "useIotaAuth().login() — apre il modal (OAuth / wallet / Telegram)");
+      pushLog("info", "useAuthwards().login() — apre il modal (OAuth / wallet / Telegram)");
       login();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -252,7 +260,7 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
   const handleLogout = () => {
     try {
       logout();
-      pushLog("success", "useIotaAuth().logout() — session cleared");
+      pushLog("success", "useAuthwards().logout() — session cleared");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       pushLog("error", `logout() error: ${msg}`);
@@ -293,7 +301,7 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
     try {
       let jwt: string | null = null;
       try {
-        jwt = sessionStorage.getItem(SESSION_KEY);
+        jwt = readSessionJwt();
       } catch (e) {
         console.error(e);
       }
@@ -370,7 +378,7 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
               flexShrink: 0,
             }}
           />
-          <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>IOTA Auth SDK — Test Console</h1>
+          <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Authwards SDK — Test Console</h1>
         </div>
         <ConnectButton
           theme="dark"
@@ -480,10 +488,10 @@ export default function DevPanel({ backendUrl }: DevPanelProps): ReactElement {
                   alignSelf: "flex-start",
                 }}
               >
-                useIotaAuth().logout()
+                useAuthwards().logout()
               </button>
               <div>
-                <div style={{ color: C.muted, marginBottom: 6 }}>user object (from useIotaAuth)</div>
+                <div style={{ color: C.muted, marginBottom: 6 }}>user object (from useAuthwards)</div>
                 <pre
                   style={{
                     background: C.pre,

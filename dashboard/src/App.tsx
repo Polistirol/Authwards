@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-import { IotaAuthProvider } from "./sdk";
+import { AuthwardsProvider } from "./sdk";
 import Dashboard from "./pages/Dashboard";
 import DemoApp from "./pages/DemoApp";
 import Home from "./pages/Home";
@@ -9,7 +9,7 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL as string;
 
 function App() {
   return (
-    <IotaAuthProvider backendUrl={backendUrl} telegramLoginEnabled>
+    <AuthwardsProvider backendUrl={backendUrl} telegramLoginEnabled>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -18,7 +18,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-    </IotaAuthProvider>
+    </AuthwardsProvider>
   );
 }
 

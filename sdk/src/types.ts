@@ -1,6 +1,9 @@
-export type IotaAuthConfig = {
+export type AuthwardsConfig = {
   backendUrl: string;
 };
+
+/** @deprecated Use `AuthwardsConfig`. */
+export type IotaAuthConfig = AuthwardsConfig;
 
 export type AuthProviderType = "google" | "github" | "wallet" | "telegram";
 

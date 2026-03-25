@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { ConnectButton, useAgent, useIotaAuth } from "../../../sdk";
+import { ConnectButton, useAgent, useAuthwards } from "../../../sdk";
 import { findAgentForShipment } from "../lib/agents";
 import { truncateDid } from "../lib/format";
 import { fetchShipments } from "../lib/shipmentsApi";
@@ -10,7 +10,7 @@ import { ShipmentCard } from "../components/ShipmentCard";
 import { TraceFlowFooter, TraceFlowHeader, TraceFlowShell } from "../components/TraceFlowLayout";
 
 export function Shipments() {
-  const { user, token, backendUrl } = useIotaAuth();
+  const { user, token, backendUrl } = useAuthwards();
   const { agents } = useAgent();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);

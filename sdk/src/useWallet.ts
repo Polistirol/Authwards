@@ -1,6 +1,6 @@
 import { useCallback, useContext, useState } from "react";
 
-import { IotaAuthContext } from "./IotaAuthContext";
+import { AuthwardsContext } from "./AuthwardsContext";
 
 export type WalletBalanceResponse = {
   address: string;
@@ -27,9 +27,9 @@ function trimTrailingSlash(url: string): string {
 }
 
 export function useWallet(): UseWalletResult {
-  const ctx = useContext(IotaAuthContext);
+  const ctx = useContext(AuthwardsContext);
   if (!ctx) {
-    throw new Error("useWallet must be used within IotaAuthProvider");
+    throw new Error("useWallet must be used within AuthwardsProvider");
   }
 
   const { backendUrl, token } = ctx;

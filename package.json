@@ -1,5 +1,5 @@
 {
-  "name": "iotauth-identity-spike",
+  "name": "authwards",
   "version": "0.0.1",
   "private": true,
   "description": "End-to-end spike: OAuth simulation, encrypted Ed25519 key, IOTA Identity DID, transfers on testnet",

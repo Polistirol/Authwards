@@ -246,10 +246,10 @@ export function LoginModal({
         onClick={handleCardClick}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="iota-auth-login-title"
+        aria-labelledby="authwards-login-title"
       >
-        <h2 id="iota-auth-login-title" style={titleStyle}>
-          Sign in to IOTA
+        <h2 id="authwards-login-title" style={titleStyle}>
+          Sign in to Authwards
         </h2>
         <p style={subtitleStyle}>
           Choose how to sign in. Your decentralized identity is created automatically.

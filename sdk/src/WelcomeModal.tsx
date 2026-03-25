@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactElement } from "react";
 import { useCallback, useMemo, useState } from "react";
 
-import { useIotaAuth } from "./useIotaAuth";
+import { useAuthwards } from "./useAuthwards";
 
 const ACCENT = "#6ee7b7";
 
@@ -88,7 +88,7 @@ export function WelcomeModal(): ReactElement | null {
     did,
     walletAddress,
     acknowledgeFirstLogin,
-  } = useIotaAuth();
+  } = useAuthwards();
 
   const [revealed, setRevealed] = useState(false);
   const [savedConfirm, setSavedConfirm] = useState(false);
@@ -168,8 +168,8 @@ export function WelcomeModal(): ReactElement | null {
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="iota-auth-welcome-title"
-        aria-describedby="iota-auth-welcome-desc"
+        aria-labelledby="authwards-welcome-title"
+        aria-describedby="authwards-welcome-desc"
         style={cardStyle}
         onClick={(e) => e.stopPropagation()}
       >
@@ -191,7 +191,7 @@ export function WelcomeModal(): ReactElement | null {
             </svg>
           </div>
           <h1
-            id="iota-auth-welcome-title"
+            id="authwards-welcome-title"
             style={{
               marginTop: 20,
               marginBottom: 0,
@@ -201,9 +201,9 @@ export function WelcomeModal(): ReactElement | null {
               color: "#ffffff",
             }}
           >
-            Welcome to IOTA
+            Welcome to Authwards
           </h1>
-          <p id="iota-auth-welcome-desc" style={{ marginTop: 8, fontSize: 14, color: "#94a3b8" }}>
+          <p id="authwards-welcome-desc" style={{ marginTop: 8, fontSize: 14, color: "#94a3b8" }}>
             Your decentralized identity has been created
           </p>
         </header>

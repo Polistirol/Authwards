@@ -2,7 +2,7 @@ import { createContext } from "react";
 
 import type { AuthProviderType, User } from "./types";
 
-export type IotaAuthContextValue = {
+export type AuthwardsContextValue = {
   backendUrl: string;
   user: User | null;
   token: string | null;
@@ -23,4 +23,4 @@ export type IotaAuthContextValue = {
   iotaWalletDownloadUrl: string;
 };
 
-export const IotaAuthContext = createContext<IotaAuthContextValue | null>(null);
+export const AuthwardsContext = createContext<AuthwardsContextValue | null>(null);

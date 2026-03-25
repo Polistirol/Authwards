@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { IotaAuthContext, type IotaAuthContextValue } from "./IotaAuthContext";
+import { AuthwardsContext, type AuthwardsContextValue } from "./AuthwardsContext";
 import { LoginModal } from "./LoginModal";
 import { WelcomeModal } from "./WelcomeModal";
 import type { AuthProviderType, User } from "./types";
@@ -18,11 +18,39 @@ import {
   signPersonalMessageWithWallet,
 } from "./walletConnection";
 
-const SESSION_KEY = "iota-auth:jwt";
+/** Current session key; legacy `iota-auth:jwt` is still read on bootstrap. */
+const SESSION_KEY = "authwards:jwt";
+const LEGACY_SESSION_KEY = "iota-auth:jwt";
+
+function getStoredJwt(): string | null {
+  try {
+    return sessionStorage.getItem(SESSION_KEY) ?? sessionStorage.getItem(LEGACY_SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredJwt(token: string): void {
+  try {
+    sessionStorage.setItem(SESSION_KEY, token);
+    sessionStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch (e) {
+    console.error("[@authwards/sdk] sessionStorage set failed:", e);
+  }
+}
+
+function removeStoredJwt(): void {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch (e) {
+    console.error("[@authwards/sdk] sessionStorage remove failed:", e);
+  }
+}
 
 const DEFAULT_WALLET_DOWNLOAD = "https://wiki.iota.org/get-started/introduction/";
 
-export type IotaAuthProviderProps = {
+export type AuthwardsProviderProps = {
   backendUrl: string;
   children: ReactNode;
   /** Shows "Sign in with Telegram" (popup → backend). If omitted, visible only when `telegramBotUsername` is set (legacy). */
@@ -47,13 +75,13 @@ async function fetchMe(backendUrl: string, token: string): Promise<User | null> 
   });
   if (res.status === 401) return null;
   if (!res.ok) {
-    console.error("[@iota-auth/sdk] GET /auth/me failed:", res.status, await res.text());
+    console.error("[@authwards/sdk] GET /auth/me failed:", res.status, await res.text());
     return null;
   }
   try {
     return (await res.json()) as User;
   } catch (e) {
-    console.error("[@iota-auth/sdk] GET /auth/me JSON parse error:", e);
+    console.error("[@authwards/sdk] GET /auth/me JSON parse error:", e);
     return null;
   }
 }
@@ -67,14 +95,25 @@ function shouldShowTelegramButton(
   return Boolean(telegramBotUsername?.trim());
 }
 
-export function IotaAuthProvider({
+function isTelegramTokenMessage(rec: { type?: string; token?: string }): boolean {
+  return (
+    (rec.type === "authwards-token" || rec.type === "iota-auth-token") &&
+    typeof rec.token === "string"
+  );
+}
+
+function isTelegramErrorMessage(rec: { type?: string }): boolean {
+  return rec.type === "authwards-error" || rec.type === "iota-auth-error";
+}
+
+export function AuthwardsProvider({
   backendUrl,
   children,
   telegramLoginEnabled,
   telegramBotUsername,
   iotaWalletDownloadUrl = DEFAULT_WALLET_DOWNLOAD,
   showWelcomeModal = true,
-}: IotaAuthProviderProps): ReactElement {
+}: AuthwardsProviderProps): ReactElement {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,11 +127,7 @@ export function IotaAuthProvider({
   const showTelegram = shouldShowTelegramButton(telegramLoginEnabled, telegramBotUsername);
 
   const completeSession = useCallback((newToken: string, u: User) => {
-    try {
-      sessionStorage.setItem(SESSION_KEY, newToken);
-    } catch (e) {
-      console.error("[@iota-auth/sdk] sessionStorage set failed:", e);
-    }
+    setStoredJwt(newToken);
     setToken(newToken);
     setUser(u);
     setLoginModalOpen(false);
@@ -122,10 +157,10 @@ export function IotaAuthProvider({
       const data = ev.data;
       if (!data || typeof data !== "object") return;
       const rec = data as { type?: string; token?: string; error?: string };
-      if (rec.type === "iota-auth-token" && typeof rec.token === "string") {
+      if (isTelegramTokenMessage(rec)) {
         window.removeEventListener("message", onMessage);
         telegramMessageListenerRef.current = null;
-        const jwt = rec.token;
+        const jwt = rec.token as string;
         void (async () => {
           const me = await fetchMe(backendUrl, jwt);
           if (me) {
@@ -134,7 +169,7 @@ export function IotaAuthProvider({
             setTelegramPopupError("Invalid session after Telegram login.");
           }
         })();
-      } else if (rec.type === "iota-auth-error") {
+      } else if (isTelegramErrorMessage(rec)) {
         window.removeEventListener("message", onMessage);
         telegramMessageListenerRef.current = null;
         setTelegramPopupError(
@@ -202,7 +237,7 @@ export function IotaAuthProvider({
       }
       if (provider === "wallet") {
         void connectWallet().catch((e: unknown) => {
-          console.error("[@iota-auth/sdk] connectWallet:", e);
+          console.error("[@authwards/sdk] connectWallet:", e);
         });
         return;
       }
@@ -218,11 +253,7 @@ export function IotaAuthProvider({
   }, [login]);
 
   const logout = useCallback(() => {
-    try {
-      sessionStorage.removeItem(SESSION_KEY);
-    } catch (e) {
-      console.error("[@iota-auth/sdk] sessionStorage remove failed:", e);
-    }
+    removeStoredJwt();
     setToken(null);
     setUser(null);
     setRecoveryPhrase(null);
@@ -247,7 +278,7 @@ export function IotaAuthProvider({
           Boolean(urlToken) || params.has("recovery") || params.has("firstLogin");
 
         if (urlToken) {
-          sessionStorage.setItem(SESSION_KEY, urlToken);
+          setStoredJwt(urlToken);
           params.delete("token");
         }
         if (recoveryParam) {
@@ -266,12 +297,7 @@ export function IotaAuthProvider({
           window.history.replaceState(null, "", next);
         }
 
-        let stored: string | null = null;
-        try {
-          stored = sessionStorage.getItem(SESSION_KEY);
-        } catch (e) {
-          console.error("[@iota-auth/sdk] sessionStorage read failed:", e);
-        }
+        const stored = getStoredJwt();
 
         if (!stored) {
           if (!cancelled) {
@@ -288,11 +314,7 @@ export function IotaAuthProvider({
         if (cancelled) return;
 
         if (me === null) {
-          try {
-            sessionStorage.removeItem(SESSION_KEY);
-          } catch (e) {
-            console.error("[@iota-auth/sdk] sessionStorage remove after 401:", e);
-          }
+          removeStoredJwt();
           setToken(null);
           setUser(null);
         } else {
@@ -309,7 +331,7 @@ export function IotaAuthProvider({
     };
   }, [backendUrl]);
 
-  const value = useMemo<IotaAuthContextValue>(
+  const value = useMemo<AuthwardsContextValue>(
     () => ({
       backendUrl: base,
       user,
@@ -349,7 +371,7 @@ export function IotaAuthProvider({
   );
 
   return (
-    <IotaAuthContext.Provider value={value}>
+    <AuthwardsContext.Provider value={value}>
       {children}
       <LoginModal
         isOpen={loginModalOpen}
@@ -365,6 +387,6 @@ export function IotaAuthProvider({
         iotaWalletDownloadUrl={iotaWalletDownloadUrl}
       />
       {showWelcomeModal ? <WelcomeModal /> : null}
-    </IotaAuthContext.Provider>
+    </AuthwardsContext.Provider>
   );
 }

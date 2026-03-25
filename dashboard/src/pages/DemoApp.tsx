@@ -1,23 +1,23 @@
-import { useIotaAuth } from "../sdk";
+import { useAuthwards } from "../sdk";
 
-const CODE_SNIPPET = `import { IotaAuthProvider, useIotaAuth } from "@iota-auth/sdk";
+const CODE_SNIPPET = `import { AuthwardsProvider, useAuthwards } from "@authwards/sdk";
 
 function App() {
   return (
-    <IotaAuthProvider backendUrl="http://localhost:3000">
+    <AuthwardsProvider backendUrl="http://localhost:3000">
       <MyDapp />
-    </IotaAuthProvider>
+    </AuthwardsProvider>
   );
 }
 
 function MyDapp() {
-  const { user, did, isAuthenticated, login, logout } = useIotaAuth();
+  const { user, did, isAuthenticated, login, logout } = useAuthwards();
   if (!isAuthenticated) return <button onClick={login}>Sign in</button>;
   return <p>Welcome, {user?.name} — {did}</p>;
 }`;
 
 export default function DemoApp() {
-  const { user, did, isAuthenticated, loading, login } = useIotaAuth();
+  const { user, did, isAuthenticated, loading, login } = useAuthwards();
 
   return (
     <div className="min-h-screen bg-[#1e293b] text-slate-100">
@@ -38,14 +38,14 @@ export default function DemoApp() {
         ) : !isAuthenticated ? (
           <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-10 text-center shadow-xl">
             <p className="text-lg text-slate-200">
-              To use this dApp, sign in with IOTA Auth
+              To use this dApp, sign in with Authwards
             </p>
             <button
               type="button"
               onClick={() => login()}
               className="mt-8 rounded-xl bg-[#60a5fa] px-8 py-3 font-semibold text-[#0f172a] shadow-[0_0_24px_rgba(96,165,250,0.35)] transition hover:bg-[#93c5fd]"
             >
-              Sign in with IOTA Auth
+              Sign in with Authwards
             </button>
           </div>
         ) : (
@@ -58,7 +58,7 @@ export default function DemoApp() {
                 </code>
               </p>
               <p className="mt-4 leading-relaxed text-slate-400">
-                This dApp is powered by the IOTA Auth SDK. The developer integrated
+                This dApp is powered by the Authwards SDK. The developer integrated
                 authentication in just a few lines of code.
               </p>
             </div>

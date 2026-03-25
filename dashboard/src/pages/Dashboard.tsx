@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
-import { useAgent, useIotaAuth } from "../sdk";
+import { useAgent, useAuthwards } from "../sdk";
 import type { Agent, AgentStatus, CreateAgentResult, User } from "../sdk";
 import AgentCard from "../components/AgentCard";
 import FundAgentModal from "../components/FundAgentModal";
@@ -137,7 +137,7 @@ function formatIotaFromNanos(nanos: string | undefined): string {
 
 export default function Dashboard() {
   const { user, did, isAuthenticated, loading, logout, backendUrl, token } =
-    useIotaAuth();
+    useAuthwards();
   const {
     agents,
     loading: agentsLoading,
