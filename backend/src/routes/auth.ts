@@ -251,6 +251,8 @@ router.get("/google", (req, res, next) => {
     const state = encodeOAuthReturnState(returnTo);
     passport.authenticate("google", {
       scope: ["profile", "email"],
+      /** Mostra sempre il selettore account Google (altrimenti riusa la sessione browser). */
+      prompt: "select_account",
       session: false,
       state,
     })(req, res, next);

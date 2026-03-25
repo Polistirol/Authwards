@@ -16,6 +16,8 @@ export type { CreateAgentInput, CreateAgentResult, UseAgentResult } from "./src/
 export { LoginModal } from "./src/LoginModal";
 export type { LoginModalProps } from "./src/LoginModal";
 
+export { WelcomeModal } from "./src/WelcomeModal";
+
 export { ConnectButton } from "./src/ConnectButton";
 export type { ConnectButtonProps } from "./src/ConnectButton";
 

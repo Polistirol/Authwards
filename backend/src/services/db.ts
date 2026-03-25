@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 
 import type { AuthProviderType, DbAgent, DbAgentLog, DbShape, DbShipment, DbUser } from "../types/db.js";
-import { DB_PATH } from "../paths.js";
+import { DB_INIT_PATH, DB_PATH } from "../paths.js";
 
 const emptyDb = (): DbShape => ({
   users: [],
@@ -121,10 +121,63 @@ function needsDbRepair(parsed: unknown): boolean {
   );
 }
 
+async function readDbInitFromDisk(): Promise<DbShape | null> {
+  const exists = await fs.pathExists(DB_INIT_PATH);
+  if (!exists) return null;
+  try {
+    const raw = await fs.readFile(DB_INIT_PATH, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    return normalizeDb(parsed).shape;
+  } catch (e) {
+    console.error("[db] Lettura db_init.json fallita:", e);
+    return null;
+  }
+}
+
+/** Aggiunge shipments da `init` che non esistono già (chiave `id`). Non tocca users/agents/agentLogs. */
+export function mergeShipmentsFromInit(current: DbShape, init: DbShape): { merged: DbShape; addedCount: number } {
+  const seen = new Set(current.shipments.map((s) => s.id));
+  const mergedShipments = [...current.shipments];
+  let addedCount = 0;
+  for (const s of init.shipments) {
+    if (seen.has(s.id)) continue;
+    mergedShipments.push(s);
+    seen.add(s.id);
+    addedCount++;
+  }
+  return {
+    merged: { ...current, shipments: mergedShipments },
+    addedCount,
+  };
+}
+
+/**
+ * Legge `db_init.json` e unisce nel DB su disco solo shipments nuove (per `id`).
+ * Utile dopo un deploy con nuovi record demo senza perdere utenti/agenti locali.
+ */
+export async function mergeDbInitIntoExisting(): Promise<{ addedShipments: number; changed: boolean }> {
+  const init = await readDbInitFromDisk();
+  if (!init) {
+    return { addedShipments: 0, changed: false };
+  }
+  const current = await readDb();
+  const { merged, addedCount } = mergeShipmentsFromInit(current, init);
+  if (addedCount === 0) {
+    return { addedShipments: 0, changed: false };
+  }
+  await writeDb(merged);
+  return { addedShipments: addedCount, changed: true };
+}
+
 export async function ensureDbFile(): Promise<void> {
   const exists = await fs.pathExists(DB_PATH);
   if (!exists) {
-    await fs.writeJson(DB_PATH, emptyDb(), { spaces: 2 });
+    const init = await readDbInitFromDisk();
+    if (init) {
+      await fs.writeFile(DB_PATH, JSON.stringify(init, null, 2), "utf8");
+    } else {
+      await fs.writeJson(DB_PATH, emptyDb(), { spaces: 2 });
+    }
     return;
   }
   try {

@@ -8,7 +8,6 @@ import AgentCard from "../components/AgentCard";
 import FundAgentModal from "../components/FundAgentModal";
 import SnippetModal from "../components/SnippetModal";
 import TrustChain from "../components/TrustChain";
-import WelcomeModal from "../components/WelcomeModal";
 
 function highlightJsonText(text: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -341,7 +340,7 @@ export default function Dashboard() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
-              src={user.picture}
+              src={user.picture ?? undefined}
               alt=""
               className="h-11 w-11 rounded-full border border-white/10"
             />
@@ -761,7 +760,6 @@ export default function Dashboard() {
         />
       ) : null}
 
-      <WelcomeModal />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 
 import { IotaAuthContext, type IotaAuthContextValue } from "./IotaAuthContext";
 import { LoginModal } from "./LoginModal";
+import { WelcomeModal } from "./WelcomeModal";
 import type { AuthProviderType, User } from "./types";
 import {
   resolveIotaWalletAdapter,
@@ -29,6 +30,11 @@ export type IotaAuthProviderProps = {
   /** @deprecated Solo per compatibilità: se `telegramLoginEnabled` è omesso, il bottone Telegram compare se valorizzato. */
   telegramBotUsername?: string;
   iotaWalletDownloadUrl?: string;
+  /**
+   * Se true (default), al primo login OAuth mostra il modal con seed phrase / DID / wallet.
+   * Disattivalo per white-label o se gestisci tu la UI (restano disponibili `recoveryPhrase` / `isFirstLogin` dal context).
+   */
+  showWelcomeModal?: boolean;
 };
 
 function trimTrailingSlash(url: string): string {
@@ -67,6 +73,7 @@ export function IotaAuthProvider({
   telegramLoginEnabled,
   telegramBotUsername,
   iotaWalletDownloadUrl = DEFAULT_WALLET_DOWNLOAD,
+  showWelcomeModal = true,
 }: IotaAuthProviderProps): ReactElement {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -357,6 +364,7 @@ export function IotaAuthProvider({
         telegramError={telegramPopupError}
         iotaWalletDownloadUrl={iotaWalletDownloadUrl}
       />
+      {showWelcomeModal ? <WelcomeModal /> : null}
     </IotaAuthContext.Provider>
   );
 }

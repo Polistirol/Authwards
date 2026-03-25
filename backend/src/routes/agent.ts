@@ -5,6 +5,7 @@ import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
 import * as db from "../services/db.js";
 import { createAgentDid } from "../services/did.js";
 import { deriveAgentKeypair } from "../services/keyDerivation.js";
+import { buildAgentSnippetPayload } from "../services/agentSnippetProviders.js";
 import {
   createPermitOnChain,
   isPermitContractConfigured,
@@ -315,49 +316,8 @@ router.get("/:agentDid/snippet", requireJwt, async (req, res) => {
     }
 
     const platformUrl = (process.env.BACKEND_URL ?? `http://localhost:3000`).replace(/\/+$/, "");
-    const agentToken = agent.agentToken;
 
-    const snippets = {
-      n8n: {
-        label: "n8n Workflow",
-        description: "Workflow HTTP per n8n (dopo attivazione dalla dashboard)",
-        steps: [
-          "1. Attiva l’agente dalla dashboard (bottone «Attiva Agente»).",
-          "2. Crea un workflow in n8n.",
-          "3. Aggiungi un nodo Schedule Trigger (es. ogni 30 secondi).",
-          "4. Aggiungi un nodo HTTP Request:",
-          `   URL: ${platformUrl}/bridge/check`,
-          "   Method: POST",
-          `   Header: Authorization: Bearer ${agentToken}`,
-          "5. Aggiungi un nodo IF: $json.conditionMet == true",
-          "6. Se true, aggiungi HTTP Request:",
-          `   URL: ${platformUrl}/bridge/execute`,
-          "   Method: POST",
-          `   Header: Authorization: Bearer ${agentToken}`,
-          '   Body: {"action": "release_payment"}',
-        ],
-        checkCommand: `curl -X POST ${platformUrl}/bridge/check -H 'Authorization: Bearer ${agentToken}'`,
-        executeCommand: `curl -X POST ${platformUrl}/bridge/execute -H 'Authorization: Bearer ${agentToken}' -H 'Content-Type: application/json' -d '{\"action\": \"release_payment\"}'`,
-      },
-      curl: {
-        label: "cURL (generico)",
-        description: "Comandi cURL (richiede agente già attivo dalla dashboard)",
-        check: `curl -X POST ${platformUrl}/bridge/check \\\n  -H 'Authorization: Bearer ${agentToken}'`,
-        execute: `curl -X POST ${platformUrl}/bridge/execute \\\n  -H 'Authorization: Bearer ${agentToken}' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"action\": \"release_payment\"}'`,
-      },
-      javascript: {
-        label: "JavaScript / Node.js",
-        description: "Codice JS per integrazione programmatica",
-        code: `const AGENT_TOKEN = '${agentToken}';\nconst API = '${platformUrl}/bridge';\n\n// L'agente deve essere già attivo dalla dashboard.\n\nconst check = await fetch(\`\${API}/check\`, {\n  method: 'POST',\n  headers: { 'Authorization': \`Bearer \${AGENT_TOKEN}\` }\n}).then(r => r.json());\n\nif (check.conditionMet) {\n  const result = await fetch(\`\${API}/execute\`, {\n    method: 'POST',\n    headers: {\n      'Authorization': \`Bearer \${AGENT_TOKEN}\`,\n      'Content-Type': 'application/json'\n    },\n    body: JSON.stringify({ action: 'release_payment' })\n  }).then(r => r.json());\n  console.log('TX:', result.txHash);\n}`,
-      },
-    };
-
-    res.json({
-      agentDid: agent.agentDid,
-      platformUrl,
-      agentToken,
-      snippets,
-    });
+    res.json(buildAgentSnippetPayload(agent, platformUrl));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Errore snippet";
     res.status(500).json({ error: msg });

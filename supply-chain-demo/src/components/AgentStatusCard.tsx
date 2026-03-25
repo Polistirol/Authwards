@@ -5,7 +5,7 @@ import { useAgent, useIotaAuth, useWallet } from "../../../sdk";
 import { explorerObjectUrl } from "../lib/explorer";
 import { nanosToIota, truncateDid } from "../lib/format";
 import { permissionCaps } from "../lib/permissions";
-import { SnippetModal } from "./SnippetModal";
+import SnippetModal from "./SnippetModal";
 
 function effectiveStatus(agent: Agent): AgentStatus {
   if (agent.status === "pending_activation") return "created";

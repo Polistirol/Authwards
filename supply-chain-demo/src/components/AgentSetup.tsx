@@ -4,7 +4,7 @@ import type { CreateAgentResult } from "../../../sdk";
 import { useAgent, useIotaAuth } from "../../../sdk";
 import { truncateDid } from "../lib/format";
 import type { Shipment } from "../lib/shipmentsApi";
-import { SnippetModal } from "./SnippetModal";
+import SnippetModal from "./SnippetModal";
 
 export type AgentSetupProps = {
   shipment: Shipment;
