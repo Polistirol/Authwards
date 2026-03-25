@@ -10,6 +10,10 @@ node_modules/
 db.json
 keys.json
 
+# Local dev cheatsheet (URLs / curl); not for the repo
+dev_actions_cheatsheet
+dev_actions_cheatsheet.*
+
 # Build & bundler output
 dist/
 build/

@@ -221,6 +221,16 @@ export async function writeDb(data: DbShape): Promise<void> {
   await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), "utf8");
 }
 
+/**
+ * Sostituisce interamente `db.json` dopo normalizzazione/migrazione record.
+ * Può lanciare se un user/agent non è migrabile (es. manca providerId).
+ */
+export async function replaceDbFromPayload(parsed: unknown): Promise<DbShape> {
+  const { shape } = normalizeDb(parsed);
+  await writeDb(shape);
+  return shape;
+}
+
 export async function findUserByProvider(
   providerId: string,
   providerType: AuthProviderType,

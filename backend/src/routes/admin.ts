@@ -1,28 +1,30 @@
-import { Router, type Request } from "express";
+import { Router, type Request, type Response } from "express";
 
-import { mergeDbInitIntoExisting, resetDbFromInit } from "../services/db.js";
+import { mergeDbInitIntoExisting, readDb, replaceDbFromPayload, resetDbFromInit } from "../services/db.js";
 import { getMasterAddress, getMasterBalanceNanos } from "../services/masterWallet.js";
 
 const router = Router();
 
-function mergeDbInitAuthOk(req: Request): boolean {
-  const secret = process.env.MERGE_DB_INIT_SECRET?.trim();
-  if (!secret) return true;
-  const header = (req.headers["x-merge-db-init-secret"] as string | undefined)?.trim();
+function devActionSecret(): string | undefined {
+  return process.env.DEV_ACTION_SECRET?.trim();
+}
+
+/** Stesso meccanismo per merge DB, reset DB, lettura/scrittura db.json. */
+function devActionAuthOk(req: Request): boolean {
+  const secret = devActionSecret();
+  if (!secret) return false;
+  const header = (req.headers["x-dev-action-secret"] as string | undefined)?.trim();
   const bearer = req.headers.authorization?.startsWith("Bearer ")
     ? req.headers.authorization.slice(7).trim()
     : undefined;
   return header === secret || bearer === secret;
 }
 
-function resetDbFromInitAuthOk(req: Request): boolean {
-  const secret = process.env.RESET_DB_FROM_INIT_SECRET?.trim();
-  if (!secret) return false;
-  const header = (req.headers["x-reset-db-from-init-secret"] as string | undefined)?.trim();
-  const bearer = req.headers.authorization?.startsWith("Bearer ")
-    ? req.headers.authorization.slice(7).trim()
-    : undefined;
-  return header === secret || bearer === secret;
+function devActionsDisabledResponse(res: Response): void {
+  res.status(503).json({
+    error: "Dev actions disabled",
+    hint: "Set DEV_ACTION_SECRET to enable merge/reset/db-json; remove in production when not needed.",
+  });
 }
 
 /** Debug: master wallet and airdrop status (no JWT). */
@@ -44,11 +46,15 @@ router.get("/master-status", async (_req, res) => {
 
 /**
  * Merges `db_init.json` into existing `db.json`: only appends shipments with new `id` values.
- * Optional: `MERGE_DB_INIT_SECRET` — then header `X-Merge-DB-Init-Secret` or `Authorization: Bearer <secret>`.
+ * Requires `DEV_ACTION_SECRET` + `X-Dev-Action-Secret` or `Authorization: Bearer`.
  */
 router.post("/merge-db-init", async (req, res) => {
   try {
-    if (!mergeDbInitAuthOk(req)) {
+    if (!devActionSecret()) {
+      devActionsDisabledResponse(res);
+      return;
+    }
+    if (!devActionAuthOk(req)) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
@@ -65,20 +71,16 @@ router.post("/merge-db-init", async (req, res) => {
 });
 
 /**
- * Cancella lo stato in `db.json` e lo ricrea da `db_init.json` (o DB vuoto se init assente).
- * Richiede `RESET_DB_FROM_INIT_SECRET` in env + header `X-Reset-DB-From-Init-Secret` o `Authorization: Bearer`.
- * Senza variabile l’endpoint risponde 503 (disabilitato) — togli il secret in produzione quando non serve.
+ * Overwrites `db.json` from `db_init.json` (or empty DB if init missing).
+ * Requires `DEV_ACTION_SECRET` + auth header.
  */
 router.post("/reset-db-from-init", async (req, res) => {
   try {
-    if (!process.env.RESET_DB_FROM_INIT_SECRET?.trim()) {
-      res.status(503).json({
-        error: "Reset disabled",
-        hint: "Set RESET_DB_FROM_INIT_SECRET to enable; remove it in production when not needed.",
-      });
+    if (!devActionSecret()) {
+      devActionsDisabledResponse(res);
       return;
     }
-    if (!resetDbFromInitAuthOk(req)) {
+    if (!devActionAuthOk(req)) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
@@ -87,6 +89,61 @@ router.post("/reset-db-from-init", async (req, res) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error";
     res.status(500).json({ error: msg });
+  }
+});
+
+/**
+ * Reads full normalized `db.json` (users, agents, agentLogs, shipments).
+ * Requires `DEV_ACTION_SECRET` + auth header.
+ */
+router.get("/db-json", async (req, res) => {
+  try {
+    if (!devActionSecret()) {
+      devActionsDisabledResponse(res);
+      return;
+    }
+    if (!devActionAuthOk(req)) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const db = await readDb();
+    res.json(db);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+/**
+ * Replaces entire `db.json` with request body (same schema). Uses `normalizeDb` migrations.
+ */
+router.put("/db-json", async (req, res) => {
+  try {
+    if (!devActionSecret()) {
+      devActionsDisabledResponse(res);
+      return;
+    }
+    if (!devActionAuthOk(req)) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    if (!req.body || typeof req.body !== "object") {
+      res.status(400).json({ error: "Expected JSON object body" });
+      return;
+    }
+    const shape = await replaceDbFromPayload(req.body);
+    res.json({
+      ok: true,
+      counts: {
+        users: shape.users.length,
+        agents: shape.agents.length,
+        agentLogs: shape.agentLogs.length,
+        shipments: shape.shipments.length,
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error";
+    res.status(400).json({ error: msg });
   }
 });
 
