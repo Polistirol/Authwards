@@ -169,6 +169,21 @@ export async function mergeDbInitIntoExisting(): Promise<{ addedShipments: numbe
   return { addedShipments: addedCount, changed: true };
 }
 
+/**
+ * Sovrascrive `db.json` con il contenuto normalizzato di `db_init.json`.
+ * Se `db_init.json` manca o non è leggibile, scrive un DB vuoto.
+ * Perdita totale di utenti/agenti/log locali — solo per test o reset controllato.
+ */
+export async function resetDbFromInit(): Promise<{ source: "init" | "empty" }> {
+  const init = await readDbInitFromDisk();
+  if (init) {
+    await writeDb(init);
+    return { source: "init" };
+  }
+  await writeDb(emptyDb());
+  return { source: "empty" };
+}
+
 export async function ensureDbFile(): Promise<void> {
   const exists = await fs.pathExists(DB_PATH);
   if (!exists) {

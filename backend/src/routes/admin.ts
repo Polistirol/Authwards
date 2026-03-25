@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 
-import { mergeDbInitIntoExisting } from "../services/db.js";
+import { mergeDbInitIntoExisting, resetDbFromInit } from "../services/db.js";
 import { getMasterAddress, getMasterBalanceNanos } from "../services/masterWallet.js";
 
 const router = Router();
@@ -9,6 +9,16 @@ function mergeDbInitAuthOk(req: Request): boolean {
   const secret = process.env.MERGE_DB_INIT_SECRET?.trim();
   if (!secret) return true;
   const header = (req.headers["x-merge-db-init-secret"] as string | undefined)?.trim();
+  const bearer = req.headers.authorization?.startsWith("Bearer ")
+    ? req.headers.authorization.slice(7).trim()
+    : undefined;
+  return header === secret || bearer === secret;
+}
+
+function resetDbFromInitAuthOk(req: Request): boolean {
+  const secret = process.env.RESET_DB_FROM_INIT_SECRET?.trim();
+  if (!secret) return false;
+  const header = (req.headers["x-reset-db-from-init-secret"] as string | undefined)?.trim();
   const bearer = req.headers.authorization?.startsWith("Bearer ")
     ? req.headers.authorization.slice(7).trim()
     : undefined;
@@ -48,6 +58,32 @@ router.post("/merge-db-init", async (req, res) => {
       addedShipments: r.addedShipments,
       changed: r.changed,
     });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+/**
+ * Cancella lo stato in `db.json` e lo ricrea da `db_init.json` (o DB vuoto se init assente).
+ * Richiede `RESET_DB_FROM_INIT_SECRET` in env + header `X-Reset-DB-From-Init-Secret` o `Authorization: Bearer`.
+ * Senza variabile l’endpoint risponde 503 (disabilitato) — togli il secret in produzione quando non serve.
+ */
+router.post("/reset-db-from-init", async (req, res) => {
+  try {
+    if (!process.env.RESET_DB_FROM_INIT_SECRET?.trim()) {
+      res.status(503).json({
+        error: "Reset disabled",
+        hint: "Set RESET_DB_FROM_INIT_SECRET to enable; remove it in production when not needed.",
+      });
+      return;
+    }
+    if (!resetDbFromInitAuthOk(req)) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const r = await resetDbFromInit();
+    res.json({ ok: true, source: r.source });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error";
     res.status(500).json({ error: msg });
