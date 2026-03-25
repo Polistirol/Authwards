@@ -46,7 +46,6 @@ export function Shipments() {
         right={
           <ConnectButton
             theme="dark"
-            label="Sign in with Google"
             frontendUrl={import.meta.env.VITE_FRONTEND_URL || undefined}
           />
         }

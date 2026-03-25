@@ -160,7 +160,6 @@ export function ShipmentDetail() {
             </Link>
             <ConnectButton
               theme="dark"
-              label="Sign in with Google"
               frontendUrl={import.meta.env.VITE_FRONTEND_URL || undefined}
             />
           </div>

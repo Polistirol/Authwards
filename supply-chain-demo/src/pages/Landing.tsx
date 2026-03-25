@@ -1,10 +1,33 @@
-import { Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 import { ConnectButton, useIotaAuth } from "../../../sdk";
 import { TraceFlowFooter, TraceFlowHeader, TraceFlowShell } from "../components/TraceFlowLayout";
 
 export function Landing() {
-  const { user, login } = useIotaAuth();
+  const { user, loading } = useIotaAuth();
+
+  if (loading) {
+    return (
+      <TraceFlowShell>
+        <TraceFlowHeader
+          right={
+            <ConnectButton
+              theme="dark"
+              frontendUrl={import.meta.env.VITE_FRONTEND_URL || undefined}
+            />
+          }
+        />
+        <main className="mx-auto flex max-w-3xl flex-1 flex-col items-center justify-center px-4 py-16 text-center text-slate-400">
+          Loading…
+        </main>
+        <TraceFlowFooter />
+      </TraceFlowShell>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/shipments" replace />;
+  }
 
   return (
     <TraceFlowShell>
@@ -12,7 +35,6 @@ export function Landing() {
         right={
           <ConnectButton
             theme="dark"
-            label="Sign in with Google"
             frontendUrl={import.meta.env.VITE_FRONTEND_URL || undefined}
           />
         }
@@ -29,24 +51,6 @@ export function Landing() {
         <p className="mt-6 max-w-xl text-lg text-slate-400">
           Sign in to monitor your shipments and delegate autonomous agents for supplier payments.
         </p>
-        <div className="mt-10">
-          {user ? (
-            <Link
-              to="/shipments"
-              className="inline-flex rounded-xl bg-amber-500 px-8 py-3 text-base font-semibold text-[#0c1220] shadow-lg shadow-amber-500/20 hover:bg-amber-400"
-            >
-              Open shipments
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={() => login()}
-              className="inline-flex rounded-xl bg-amber-500 px-8 py-3 text-base font-semibold text-[#0c1220] shadow-lg shadow-amber-500/20 hover:bg-amber-400"
-            >
-              Sign in with Google
-            </button>
-          )}
-        </div>
       </main>
       <TraceFlowFooter />
     </TraceFlowShell>
