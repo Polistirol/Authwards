@@ -52,34 +52,62 @@ function decodeOAuthReturnState(state: unknown): string | null {
   }
 }
 
-function isAllowedReturnUrl(fullUrl: string): boolean {
+/** `https` or `http` only on localhost loopback (dev). */
+function isValidOAuthReturnUrlStructure(urlStr: string): boolean {
   try {
-    const u = new URL(fullUrl);
+    const u = new URL(urlStr);
     if (!/^https?:$/i.test(u.protocol)) return false;
-    return isOriginAllowed(`${u.protocol}//${u.host}`);
+    const host = u.hostname.toLowerCase();
+    const isLocal =
+      host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+    if (u.protocol === "http:" && !isLocal) return false;
+    return true;
   } catch {
     return false;
   }
 }
 
-function resolveReturnToFromQuery(returnToParam: unknown, fallback: string): string {
+/** True if the page that started login (Referer) is the same origin as return_to. */
+function returnToMatchesReferrer(returnTo: string, referer: string | undefined): boolean {
+  if (!referer?.trim()) return false;
+  try {
+    const r = new URL(referer);
+    const t = new URL(returnTo);
+    return r.origin === t.origin;
+  } catch {
+    return false;
+  }
+}
+
+function resolveReturnToFromQuery(
+  returnToParam: unknown,
+  fallback: string,
+  referer: string | undefined,
+): string {
   if (typeof returnToParam !== "string" || !returnToParam.trim()) return fallback;
   const trimmed = returnToParam.trim();
+  if (!isValidOAuthReturnUrlStructure(trimmed)) return fallback;
   try {
     const u = new URL(trimmed);
-    if (!/^https?:$/i.test(u.protocol)) return fallback;
-    if (!isOriginAllowed(`${u.protocol}//${u.host}`)) return fallback;
-    return trimmed;
+    const origin = `${u.protocol}//${u.host}`;
+    if (isOriginAllowed(origin)) return trimmed;
+    if (returnToMatchesReferrer(trimmed, referer)) return trimmed;
+    return fallback;
   } catch {
     return fallback;
   }
 }
 
+/**
+ * After Google/GitHub redirects back, Referer is not the embedding dApp. Trust `state`:
+ * it was set on GET /auth/:provider with the same checks as resolveReturnToFromQuery, and
+ * Passport validates `state` with the IdP.
+ */
 function redirectBaseFromState(req: { query: Record<string, unknown> }, fallback: string): string {
   const raw = req.query.state;
   const state = Array.isArray(raw) ? raw[0] : raw;
   const decoded = decodeOAuthReturnState(state);
-  if (decoded && isAllowedReturnUrl(decoded)) return decoded;
+  if (decoded && isValidOAuthReturnUrlStructure(decoded)) return decoded;
   return fallback;
 }
 
@@ -247,7 +275,7 @@ router.get("/google", (req, res, next) => {
     const fallback = getFrontendUrl();
     const rt = req.query.return_to;
     const returnToParam = Array.isArray(rt) ? rt[0] : rt;
-    const returnTo = resolveReturnToFromQuery(returnToParam, fallback);
+    const returnTo = resolveReturnToFromQuery(returnToParam, fallback, req.get("referer"));
     const state = encodeOAuthReturnState(returnTo);
     passport.authenticate("google", {
       scope: ["profile", "email"],
@@ -301,7 +329,7 @@ router.get("/github", (req, res, next) => {
     const fallback = getFrontendUrl();
     const rt = req.query.return_to;
     const returnToParam = Array.isArray(rt) ? rt[0] : rt;
-    const returnTo = resolveReturnToFromQuery(returnToParam, fallback);
+    const returnTo = resolveReturnToFromQuery(returnToParam, fallback, req.get("referer"));
     const state = encodeOAuthReturnState(returnTo);
     passport.authenticate("github", {
       session: false,
