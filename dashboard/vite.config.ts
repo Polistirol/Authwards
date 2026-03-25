@@ -15,6 +15,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    /** SDK lives outside `node_modules`; without this, Vite can bundle two Reacts → hooks crash (useState on null). */
+    resolve: {
+      dedupe: ["react", "react-dom"],
+      alias: {
+        react: path.resolve(__dirname, "node_modules/react"),
+        "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      },
+    },
     server: {
       fs: {
         allow: [path.join(__dirname, "..")],
