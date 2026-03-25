@@ -17,11 +17,12 @@ export function Shipments() {
 
   useEffect(() => {
     if (!token) return;
+    const jwt = token;
     let cancelled = false;
 
     async function load(): Promise<void> {
       try {
-        const list = await fetchShipments(backendUrl, token);
+        const list = await fetchShipments(backendUrl, jwt);
         if (!cancelled) {
           setShipments(list);
           setLoadErr(null);
