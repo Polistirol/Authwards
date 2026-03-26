@@ -315,7 +315,7 @@ export default function AgentCard({
           </p>
           <div className="mt-1 flex flex-wrap items-start gap-2">
             <code
-              className="break-all font-mono text-sm leading-snug text-[#6ee7b7]"
+              className="break-all font-mono text-sm leading-snug text-aw-accent"
               title={agent.agentDid}
             >
               {formatAgentDidDisplay(agent.agentDid)}
@@ -325,10 +325,10 @@ export default function AgentCard({
               onClick={() => void copyToClipboard(agent.agentDid, "did")}
               aria-label="Copy DID"
               title={copiedField === "did" ? "Copied" : "Copy DID"}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
             >
               {copiedField === "did" ? (
-                <IconCheck className="h-3.5 w-3.5 text-[#6ee7b7]" />
+                <IconCheck className="h-3.5 w-3.5 text-aw-accent" />
               ) : (
                 <IconClipboard className="h-3.5 w-3.5" />
               )}
@@ -345,12 +345,12 @@ export default function AgentCard({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 rounded-xl border border-[#2a2d3a] bg-[#12131a]/80 p-4 sm:grid-cols-2">
+      <div className="mt-6 grid gap-4 rounded-xl border border-aw-border/80 bg-aw-surface/80 p-4 sm:grid-cols-2">
         <div>
           <p className="text-xs font-medium uppercase text-slate-500">Wallet</p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <p
-              className="min-w-0 font-mono text-sm text-[#6ee7b7]"
+              className="min-w-0 font-mono text-sm text-aw-accent"
               title={walletAddr || undefined}
             >
               {walletAddr ? truncateWalletAddress(walletAddr) : "—"}
@@ -361,10 +361,10 @@ export default function AgentCard({
                 onClick={() => void copyToClipboard(walletAddr, "wallet")}
                 aria-label="Copy wallet address"
                 title={copiedField === "wallet" ? "Copied" : "Copy wallet address"}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
               >
                 {copiedField === "wallet" ? (
-                  <IconCheck className="h-3.5 w-3.5 text-[#6ee7b7]" />
+                  <IconCheck className="h-3.5 w-3.5 text-aw-accent" />
                 ) : (
                   <IconClipboard className="h-3.5 w-3.5" />
                 )}
@@ -373,7 +373,7 @@ export default function AgentCard({
           </div>
           <p className="mt-1 text-sm text-slate-300">
             Balance:{" "}
-            <span className="font-mono text-[#6ee7b7]">
+            <span className="font-mono text-aw-accent">
               {balanceNanos !== null
                 ? `${formatIota(BigInt(balanceNanos))} IOTA`
                 : "…"}
@@ -399,7 +399,7 @@ export default function AgentCard({
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <code
-              className="min-w-0 break-all font-mono text-sm text-[#6ee7b7]"
+              className="min-w-0 break-all font-mono text-sm text-aw-accent"
               title={permitId || undefined}
             >
               {permitId ? truncateWalletAddress(permitId) : "—"}
@@ -411,7 +411,7 @@ export default function AgentCard({
                 rel="noopener noreferrer"
                 aria-label="View permit on IOTA Explorer"
                 title="Open in IOTA Explorer"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
               >
                 <IconArrowTopRightOnSquare className="h-3.5 w-3.5" />
               </a>
@@ -434,7 +434,7 @@ export default function AgentCard({
             <button
               type="button"
               onClick={() => openActivateModal()}
-              className="rounded-lg bg-[#6ee7b7] px-5 py-2.5 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
+              className="rounded-lg bg-aw-accent px-5 py-2.5 text-sm font-semibold text-aw-on-accent hover:bg-aw-accent-hover"
             >
               Activate delegate
             </button>
@@ -443,7 +443,7 @@ export default function AgentCard({
             <button
               type="button"
               onClick={onOpenSnippet}
-              className="rounded-lg border border-[#6ee7b7]/40 bg-[#6ee7b7]/10 px-4 py-2 text-sm font-medium text-[#6ee7b7] hover:bg-[#6ee7b7]/20"
+              className="rounded-lg border border-aw-accent/40 bg-aw-accent/10 px-4 py-2 text-sm font-medium text-aw-accent hover:bg-aw-accent/20"
             >
               View Snippet
             </button>
@@ -480,7 +480,7 @@ export default function AgentCard({
         <button
           type="button"
           onClick={() => void expandHistory()}
-          className="text-sm font-medium text-[#6ee7b7] hover:underline"
+          className="text-sm font-medium text-aw-accent hover:underline"
         >
           {historyOpen ? "Hide transaction history" : "View transaction history"}
         </button>
@@ -520,7 +520,7 @@ export default function AgentCard({
             role="dialog"
             aria-modal="true"
             aria-labelledby="activate-delegate-title"
-            className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#12141c] p-6 shadow-2xl"
+            className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-aw-panel p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2
@@ -640,7 +640,7 @@ function ActivateModalBody({
         <label className="flex cursor-pointer items-start gap-3 text-slate-200">
           <input
             type="checkbox"
-            className="mt-1 accent-[#6ee7b7]"
+            className="mt-1 accent-aw-accent"
             checked={activateConfirm}
             onChange={(e) => setActivateConfirm(e.target.checked)}
           />
@@ -697,7 +697,7 @@ function ActivateModalBody({
       <label className="flex cursor-pointer items-start gap-3 text-slate-200">
         <input
           type="checkbox"
-          className="mt-1 accent-[#6ee7b7]"
+          className="mt-1 accent-aw-accent"
           checked={activateConfirm}
           onChange={(e) => setActivateConfirm(e.target.checked)}
         />
@@ -755,7 +755,7 @@ function ActivateConfirmButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8] disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-lg bg-aw-accent px-5 py-2 text-sm font-semibold text-aw-on-accent hover:bg-aw-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
     >
       {activating ? "Activating…" : "Activate delegate"}
     </button>

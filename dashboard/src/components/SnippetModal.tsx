@@ -100,7 +100,7 @@ function MaskedToken({
         {masked}
       </span>
       <span
-        className={`recovery-phrase-crossfade text-[#e2e4ed] selection:bg-[#6ee7b7]/30 ${
+        className={`recovery-phrase-crossfade text-aw-text selection:bg-aw-accent/30 ${
           revealed ? "relative opacity-100" : "pointer-events-none absolute inset-0 opacity-0"
         }`}
       >
@@ -114,7 +114,7 @@ function MaskedToken({
 function CodePreview({ code, className = "mt-3" }: { code: string; className?: string }) {
   return (
     <pre
-      className={`max-h-72 overflow-auto rounded-lg border border-[#2a2d3a] bg-[#0a0b0f] p-3 font-mono text-xs leading-relaxed text-slate-200 whitespace-pre ${className}`}
+      className={`max-h-72 overflow-auto rounded-lg border border-aw-border/90 bg-aw-inset p-3 font-mono text-xs leading-relaxed text-slate-200 whitespace-pre ${className}`}
     >
       {code}
     </pre>
@@ -305,10 +305,10 @@ export default function SnippetModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="snippet-modal-title"
-        className="welcome-modal-enter max-h-[min(92vh,900px)] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-[#2a2d3a] bg-[#12131a] shadow-2xl"
+        className="welcome-modal-enter max-h-[min(92vh,900px)] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-aw-border/90 bg-aw-panel shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-[#2a2d3a] p-6">
+        <div className="border-b border-aw-border/50 p-6">
           <div className="flex items-start justify-between gap-4">
             <h2
               id="snippet-modal-title"
@@ -319,7 +319,7 @@ export default function SnippetModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-[#2a2d3a] px-3 py-1 text-sm text-slate-400 hover:bg-white/5"
+              className="rounded-lg border border-aw-border/80 px-3 py-1 text-sm text-slate-400 hover:bg-white/5"
             >
               Close
             </button>
@@ -332,15 +332,15 @@ export default function SnippetModal({
             </div>
           ) : null}
 
-          <div className="mt-4 space-y-3 rounded-xl border border-[#2a2d3a] bg-[#161821] p-4">
+          <div className="mt-4 space-y-3 rounded-xl border border-aw-border/80 bg-aw-surface/80 p-4">
             <div>
               <p className="text-xs uppercase text-slate-500">Delegate DID</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <code className="break-all text-sm text-[#6ee7b7]">{agentDid}</code>
+                <code className="break-all text-sm text-aw-accent">{agentDid}</code>
                 <button
                   type="button"
                   onClick={() => void copyText("did", agentDid)}
-                  className="text-xs text-[#6ee7b7] underline"
+                  className="text-xs text-aw-accent underline"
                 >
                   {copyMain === "did" ? "Copied ✓" : "Copy"}
                 </button>
@@ -355,7 +355,7 @@ export default function SnippetModal({
             <div>
               <p className="text-xs uppercase text-slate-500">Delegate token</p>
               <div className="relative mt-1 flex items-start gap-2">
-                <div className="min-h-[1.5rem] min-w-0 flex-1 rounded-lg border border-[#2a2d3a] bg-[#0a0b0f] px-3 py-2">
+                <div className="min-h-[1.5rem] min-w-0 flex-1 rounded-lg border border-aw-border/90 bg-aw-inset px-3 py-2">
                   {data?.agentToken ? (
                     <MaskedToken
                       token={data.agentToken}
@@ -367,7 +367,7 @@ export default function SnippetModal({
                 </div>
                 <button
                   type="button"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
                   title={tokenRevealed ? "Hide token" : "Show token"}
                   onClick={() => setTokenRevealed((v) => !v)}
                 >
@@ -393,7 +393,7 @@ export default function SnippetModal({
             <p className="text-sm text-red-400">{error}</p>
           ) : data && currentProvider ? (
             <>
-              <div className="flex flex-wrap gap-2 border-b border-[#2a2d3a] pb-2">
+              <div className="flex flex-wrap gap-2 border-b border-aw-border/50 pb-2">
                 {TAB_ORDER.map(({ id, label }) => (
                   <button
                     key={id}
@@ -401,7 +401,7 @@ export default function SnippetModal({
                     onClick={() => setTab(id)}
                     className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                       tab === id
-                        ? "bg-[#6ee7b7]/15 text-[#6ee7b7]"
+                        ? "bg-aw-accent/15 text-aw-accent"
                         : "text-slate-400 hover:bg-white/5"
                     }`}
                   >
@@ -438,7 +438,7 @@ export default function SnippetModal({
                   <div className="mb-2 flex justify-end">
                     <button
                       type="button"
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
                       title={tokenRevealed ? "Hide token in code" : "Show token in code"}
                       onClick={() => setTokenRevealed((v) => !v)}
                     >
@@ -450,7 +450,7 @@ export default function SnippetModal({
                     <button
                       type="button"
                       onClick={handleDownload}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#6ee7b7]/40 bg-[#6ee7b7]/10 text-[#6ee7b7] hover:bg-[#6ee7b7]/20"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-accent/40 bg-aw-accent/10 text-aw-accent hover:bg-aw-accent/20"
                       title="Download file"
                     >
                       <IconDownload />
@@ -458,11 +458,11 @@ export default function SnippetModal({
                     <button
                       type="button"
                       onClick={() => void copyText(copyKey, downloadCode)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
                       title={copyMain === copyKey ? "Copied" : "Copy code"}
                     >
                       {copyMain === copyKey ? (
-                        <IconCheck className="h-5 w-5 text-[#6ee7b7]" />
+                        <IconCheck className="h-5 w-5 text-aw-accent" />
                       ) : (
                         <IconClipboard />
                       )}

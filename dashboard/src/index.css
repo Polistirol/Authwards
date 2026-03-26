@@ -1,8 +1,23 @@
 @import "tailwindcss";
 
+/* Authwards UI — TraceFlow-inspired: deep blue canvas, slate surfaces, amber accent */
+@theme {
+  --color-aw-bg: #0c1220;
+  --color-aw-surface: #1e293b;
+  --color-aw-panel: #121c2e;
+  --color-aw-inset: #0f172a;
+  --color-aw-border: #334155;
+  --color-aw-accent: #f59e0b;
+  --color-aw-accent-hover: #fbbf24;
+  --color-aw-on-accent: #0c1220;
+  --color-aw-text: #e2e8f0;
+}
+
 @layer base {
   html {
     font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--color-aw-bg);
+    color: var(--color-aw-text);
   }
 }
 

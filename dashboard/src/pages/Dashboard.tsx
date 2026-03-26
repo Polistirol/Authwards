@@ -63,7 +63,7 @@ function highlightJsonText(text: string): ReactNode[] {
       );
     } else if (m[3]) {
       out.push(
-        <span key={key++} className="text-emerald-400">
+        <span key={key++} className="text-amber-400/90">
           {m[3]}
         </span>,
       );
@@ -104,7 +104,7 @@ function DidDocumentBlock({ user }: { user: User }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-[#6ee7b7] hover:bg-white/10"
+        className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-aw-accent hover:bg-white/10"
       >
         {open ? "Hide DID Document" : "Show DID Document"}
       </button>
@@ -340,7 +340,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0f] text-[#e2e4ed]">
+      <div className="flex min-h-screen items-center justify-center bg-aw-bg text-aw-text">
         <p className="text-sm opacity-70">Loading…</p>
       </div>
     );
@@ -355,10 +355,10 @@ export default function Dashboard() {
     `https://explorer.iota.org/testnet/did/${encodeURIComponent(did)}`;
 
   return (
-    <div className="min-h-screen bg-[#0a0b0f] text-[#e2e4ed]">
+    <div className="min-h-screen bg-aw-bg text-aw-text">
       {toast ? (
         <div
-          className="fixed bottom-6 left-1/2 z-[185] max-w-md -translate-x-1/2 rounded-xl border border-[#6ee7b7]/40 bg-[#12131a] px-5 py-3 text-center text-sm text-white shadow-xl"
+          className="fixed bottom-6 left-1/2 z-[185] max-w-md -translate-x-1/2 rounded-xl border border-aw-accent/40 bg-aw-panel px-5 py-3 text-center text-sm text-white shadow-xl"
           role="status"
         >
           {toast}
@@ -399,7 +399,7 @@ export default function Dashboard() {
               {user.walletAddress ? (
                 <>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <code className="break-all font-mono text-sm text-[#6ee7b7]">
+                    <code className="break-all font-mono text-sm text-aw-accent">
                       {user.walletAddress}
                     </code>
                     <button
@@ -407,10 +407,10 @@ export default function Dashboard() {
                       onClick={() => void copyWallet()}
                       aria-label="Copy wallet address"
                       title={walletCopied ? "Copied" : "Copy wallet address"}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
                     >
                       {walletCopied ? (
-                        <IconCheck className="h-3.5 w-3.5 text-[#6ee7b7]" />
+                        <IconCheck className="h-3.5 w-3.5 text-aw-accent" />
                       ) : (
                         <IconClipboard className="h-3.5 w-3.5" />
                       )}
@@ -421,14 +421,14 @@ export default function Dashboard() {
                       rel="noopener noreferrer"
                       aria-label="View wallet on IOTA Explorer"
                       title="Open address in IOTA Explorer"
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
                     >
                       <IconArrowTopRightOnSquare className="h-3.5 w-3.5" />
                     </a>
                   </div>
                   <p className="mt-3 text-sm text-slate-300">
                     Balance:{" "}
-                    <span className="font-mono text-[#6ee7b7]">
+                    <span className="font-mono text-aw-accent">
                       {userBalanceNanos !== null
                         ? `${formatIotaFromNanos(userBalanceNanos)} IOTA`
                         : "…"}
@@ -445,16 +445,16 @@ export default function Dashboard() {
               DID
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <code className="break-all text-sm text-[#6ee7b7]">{did}</code>
+              <code className="break-all text-sm text-aw-accent">{did}</code>
               <button
                 type="button"
                 onClick={() => void copyDid()}
                 aria-label="Copy DID"
                 title={didCopied ? "Copied" : "Copy DID"}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
               >
                 {didCopied ? (
-                  <IconCheck className="h-3.5 w-3.5 text-[#6ee7b7]" />
+                  <IconCheck className="h-3.5 w-3.5 text-aw-accent" />
                 ) : (
                   <IconClipboard className="h-3.5 w-3.5" />
                 )}
@@ -465,7 +465,7 @@ export default function Dashboard() {
                 rel="noopener noreferrer"
                 aria-label="View DID on IOTA Explorer"
                 title="Open DID object in IOTA Explorer"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
               >
                 <IconArrowTopRightOnSquare className="h-3.5 w-3.5" />
               </a>
@@ -496,7 +496,7 @@ export default function Dashboard() {
                 setExpiresAtLocal(defaultExpiresLocal());
                 setCreateOpen(true);
               }}
-              className="rounded-xl bg-[#6ee7b7] px-5 py-2.5 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
+              className="rounded-xl bg-aw-accent px-5 py-2.5 text-sm font-semibold text-aw-on-accent hover:bg-aw-accent-hover"
             >
               Create Delegate Identity
             </button>
@@ -540,13 +540,13 @@ export default function Dashboard() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="new-delegate-title"
-            className="flex max-h-[min(92vh,900px)] w-full max-w-[44.8rem] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#12141c] shadow-2xl"
+            className="flex max-h-[min(92vh,900px)] w-full max-w-[44.8rem] flex-col overflow-hidden rounded-2xl border border-white/10 bg-aw-panel shadow-2xl"
           >
             <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
               <h2
                 id="new-delegate-title"
                 className={`text-lg font-semibold sm:text-xl ${
-                  createStep === "pick" ? "text-white" : "text-[#6ee7b7]"
+                  createStep === "pick" ? "text-white" : "text-aw-accent"
                 }`}
               >
                 {createStep === "pick"
@@ -580,7 +580,7 @@ export default function Dashboard() {
                       onChange={(e) => setAgentName(e.target.value)}
                       placeholder="e.g. Balance monitor"
                       autoComplete="off"
-                      className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-3 text-sm text-[#e2e4ed] placeholder:text-slate-600 focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
+                      className="mt-2 w-full rounded-xl border border-aw-border/90 bg-aw-inset px-4 py-3 text-sm text-aw-text placeholder:text-slate-600 focus:border-aw-accent/50 focus:outline-none focus:ring-1 focus:ring-aw-accent/30"
                     />
                   </div>
                   <div>
@@ -596,7 +596,7 @@ export default function Dashboard() {
                       onChange={(e) => setAgentDescription(e.target.value)}
                       placeholder="Describe what this delegate will do in your workflow…"
                       rows={3}
-                      className="mt-2 w-full resize-y rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-3 text-sm text-[#e2e4ed] placeholder:text-slate-600 focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
+                      className="mt-2 w-full resize-y rounded-xl border border-aw-border/90 bg-aw-inset px-4 py-3 text-sm text-aw-text placeholder:text-slate-600 focus:border-aw-accent/50 focus:outline-none focus:ring-1 focus:ring-aw-accent/30"
                     />
                   </div>
                 </div>
@@ -609,7 +609,7 @@ export default function Dashboard() {
                       key={p.id}
                       className={`flex cursor-pointer flex-col gap-2 rounded-xl border p-3 transition sm:min-h-[7.5rem] ${
                         profile === p.id
-                          ? "border-[#6ee7b7]/60 bg-[#6ee7b7]/10"
+                          ? "border-aw-accent/60 bg-aw-accent/10"
                           : "border-white/10 bg-white/[0.02] hover:border-white/20"
                       }`}
                     >
@@ -617,7 +617,7 @@ export default function Dashboard() {
                         <input
                           type="radio"
                           name="perm"
-                          className="mt-0.5 accent-[#6ee7b7]"
+                          className="mt-0.5 accent-aw-accent"
                           checked={profile === p.id}
                           onChange={() => setProfile(p.id)}
                         />
@@ -645,7 +645,7 @@ export default function Dashboard() {
                         step={1}
                         value={customMaxPerTx}
                         onChange={(e) => setCustomMaxPerTx(Number(e.target.value))}
-                        className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-2.5 text-sm text-[#e2e4ed] focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
+                        className="mt-2 w-full rounded-xl border border-aw-border/90 bg-aw-inset px-4 py-2.5 text-sm text-aw-text focus:border-aw-accent/50 focus:outline-none focus:ring-1 focus:ring-aw-accent/30"
                       />
                     </div>
                     <div>
@@ -662,7 +662,7 @@ export default function Dashboard() {
                         step={1}
                         value={customMaxPerDay}
                         onChange={(e) => setCustomMaxPerDay(Number(e.target.value))}
-                        className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-2.5 text-sm text-[#e2e4ed] focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
+                        className="mt-2 w-full rounded-xl border border-aw-border/90 bg-aw-inset px-4 py-2.5 text-sm text-aw-text focus:border-aw-accent/50 focus:outline-none focus:ring-1 focus:ring-aw-accent/30"
                       />
                     </div>
                   </div>
@@ -671,7 +671,7 @@ export default function Dashboard() {
                   <label className="flex cursor-pointer items-center gap-3">
                     <input
                       type="checkbox"
-                      className="accent-[#6ee7b7]"
+                      className="accent-aw-accent"
                       checked={noPermitExpiry}
                       onChange={(e) => setNoPermitExpiry(e.target.checked)}
                     />
@@ -692,7 +692,7 @@ export default function Dashboard() {
                         type="datetime-local"
                         value={expiresAtLocal}
                         onChange={(e) => setExpiresAtLocal(e.target.value)}
-                        className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-2.5 text-sm text-[#e2e4ed] focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
+                        className="mt-2 w-full rounded-xl border border-aw-border/90 bg-aw-inset px-4 py-2.5 text-sm text-aw-text focus:border-aw-accent/50 focus:outline-none focus:ring-1 focus:ring-aw-accent/30"
                       />
                     </div>
                   ) : null}
@@ -710,7 +710,7 @@ export default function Dashboard() {
                     type="button"
                     disabled={creating || !agentName.trim()}
                     onClick={() => void handleCreateAgent()}
-                    className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg bg-aw-accent px-5 py-2 text-sm font-semibold text-aw-on-accent hover:bg-aw-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {creating ? "Creating…" : "Create delegate"}
                   </button>
@@ -734,14 +734,14 @@ export default function Dashboard() {
                   <p>
                     <span className="text-slate-500">Delegate DID</span>
                     <br />
-                    <code className="break-all text-[#6ee7b7]">
+                    <code className="break-all text-aw-accent">
                       {createResult.agentDid}
                     </code>
                   </p>
                   <p>
                     <span className="text-slate-500">Delegate wallet</span>
                     <br />
-                    <code className="break-all text-[#6ee7b7]">
+                    <code className="break-all text-aw-accent">
                       {createResult.walletAddress}
                     </code>
                   </p>
@@ -752,7 +752,7 @@ export default function Dashboard() {
                   </p>
                   <p className="mt-1 text-sm text-slate-400">
                     Use{" "}
-                    <span className="font-semibold text-[#6ee7b7]">Activate delegate</span> on the
+                    <span className="font-semibold text-aw-accent">Activate delegate</span> on the
                     card when you are ready.
                   </p>
                   <p className="pt-2 text-slate-400">

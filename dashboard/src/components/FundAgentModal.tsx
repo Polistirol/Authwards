@@ -77,7 +77,7 @@ export default function FundAgentModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="fund-title"
-        className="w-full max-w-md rounded-2xl border border-[#2a2d3a] bg-[#12131a] p-6 shadow-2xl"
+        className="w-full max-w-md rounded-2xl border border-aw-border/90 bg-aw-panel p-6 shadow-2xl"
         onClick={(e) => {
           e.stopPropagation();
         }}
@@ -88,7 +88,7 @@ export default function FundAgentModal({
         <p className="mt-2 text-sm text-slate-400">
           Transfer IOTA from your connected wallet to the delegate wallet address.
         </p>
-        <p className="mt-3 max-w-full break-all font-mono text-xs text-[#6ee7b7]">
+        <p className="mt-3 max-w-full break-all font-mono text-xs text-aw-accent">
           {toAddress}
         </p>
         <label className="mt-4 block">
@@ -98,7 +98,7 @@ export default function FundAgentModal({
             inputMode="decimal"
             value={iotaAmount}
             onChange={(e) => setIotaAmount(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[#2a2d3a] bg-[#0a0b0f] px-3 py-2 font-mono text-sm text-white"
+            className="mt-1 w-full rounded-lg border border-aw-border/90 bg-aw-inset px-3 py-2 font-mono text-sm text-white"
           />
         </label>
         {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
@@ -107,7 +107,7 @@ export default function FundAgentModal({
             type="button"
             disabled={busy}
             onClick={onClose}
-            className="rounded-lg border border-[#2a2d3a] px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+            className="rounded-lg border border-aw-border/80 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
           >
             Cancel
           </button>
@@ -115,7 +115,7 @@ export default function FundAgentModal({
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] disabled:opacity-50"
+            className="rounded-lg bg-aw-accent px-5 py-2 text-sm font-semibold text-aw-on-accent disabled:opacity-50"
           >
             {busy ? "Sending…" : "Transfer"}
           </button>

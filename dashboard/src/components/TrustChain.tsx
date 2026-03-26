@@ -10,7 +10,7 @@ type TrustChainProps = {
 
 function Node({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-[#6ee7b7]/35 bg-[#0f1118] px-4 py-3 text-center shadow-[0_0_0_1px_rgba(110,231,183,0.08)]">
+    <div className="rounded-xl border border-amber-500/35 bg-aw-inset px-4 py-3 text-center shadow-[0_0_0_1px_rgba(245,158,11,0.1)]">
       {children}
     </div>
   );
@@ -22,11 +22,11 @@ function Arrow({ label }: { label: string }) {
       className="relative flex min-w-[72px] flex-col items-center justify-center px-2"
       aria-hidden
     >
-      <div className="h-px w-full bg-gradient-to-r from-[#6ee7b7]/20 via-[#6ee7b7]/60 to-[#6ee7b7]/20" />
-      <span className="absolute top-1/2 -translate-y-1/2 rounded bg-[#0a0b0f] px-1.5 text-[10px] font-medium uppercase tracking-wide text-[#6ee7b7]/90">
+      <div className="h-px w-full bg-gradient-to-r from-amber-500/20 via-amber-500/60 to-amber-500/20" />
+      <span className="absolute top-1/2 -translate-y-1/2 rounded bg-aw-bg px-1.5 text-[10px] font-medium uppercase tracking-wide text-aw-accent/90">
         {label}
       </span>
-      <span className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-0.5 text-[#6ee7b7]">
+      <span className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-0.5 text-aw-accent">
         ▶
       </span>
     </div>
@@ -65,7 +65,7 @@ export default function TrustChain({
                 User DID
               </p>
               <p
-                className="mt-1 max-w-[220px] break-all font-mono text-xs text-[#6ee7b7]"
+                className="mt-1 max-w-[220px] break-all font-mono text-xs text-aw-accent"
                 title={userDid}
               >
                 {truncate(userDid, 42)}
@@ -90,7 +90,7 @@ export default function TrustChain({
                       Delegate DID
                     </p>
                     <p
-                      className="mt-1 max-w-[200px] break-all font-mono text-xs text-[#e2e4ed]"
+                      className="mt-1 max-w-[200px] break-all font-mono text-xs text-slate-200"
                       title={agent.agentDid}
                     >
                       {truncate(agent.agentDid, 36)}

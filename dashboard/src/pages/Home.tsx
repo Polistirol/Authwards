@@ -15,16 +15,16 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0f] text-[#e2e4ed]">
+      <div className="flex min-h-screen items-center justify-center bg-aw-bg text-aw-text">
         <p className="text-sm opacity-70">Loading…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0b0f] text-[#e2e4ed]">
+    <div className="min-h-screen bg-aw-bg text-aw-text">
       <header className="border-b border-white/5 px-6 py-4">
-        <span className="text-sm font-semibold tracking-wide text-[#6ee7b7]">
+        <span className="text-sm font-semibold tracking-wide text-aw-accent">
           Authwards
         </span>
       </header>
@@ -34,14 +34,14 @@ export default function Home() {
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
             Authwards
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#a8abb8]">
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
             Your Google identity becomes an IOTA DID. Create delegate identities with
             verifiable on-chain permissions.
           </p>
           <button
             type="button"
             onClick={() => login()}
-            className="mt-10 rounded-xl bg-[#6ee7b7] px-8 py-3.5 text-base font-semibold text-[#0a0b0f] shadow-[0_0_32px_rgba(110,231,183,0.25)] transition hover:bg-[#5dd9a8]"
+            className="mt-10 rounded-xl bg-aw-accent px-8 py-3.5 text-base font-semibold text-aw-on-accent shadow-[0_0_32px_rgba(245,158,11,0.22)] transition hover:bg-aw-accent-hover"
           >
             Sign in
           </button>
@@ -53,7 +53,7 @@ export default function Home() {
               <GoogleGlyph />
             </div>
             <h2 className="text-lg font-semibold text-white">Sign in with Google</h2>
-            <p className="mt-2 text-sm leading-relaxed text-[#a8abb8]">
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
               Secure OAuth authentication; no seed to manage on the device.
             </p>
           </article>
@@ -63,7 +63,7 @@ export default function Home() {
               <FingerprintIcon />
             </div>
             <h2 className="text-lg font-semibold text-white">DID on IOTA</h2>
-            <p className="mt-2 text-sm leading-relaxed text-[#a8abb8]">
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
               Self-sovereign identity on the Tangle: public, verifiable DID document.
             </p>
           </article>
@@ -73,7 +73,7 @@ export default function Home() {
               <BotIcon />
             </div>
             <h2 className="text-lg font-semibold text-white">Delegates</h2>
-            <p className="mt-2 text-sm leading-relaxed text-[#a8abb8]">
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
               Create delegates with permission profiles and track every action on-chain.
             </p>
           </article>
@@ -109,7 +109,7 @@ function GoogleGlyph() {
 function FingerprintIcon() {
   return (
     <svg
-      className="h-7 w-7 text-[#6ee7b7]"
+      className="h-7 w-7 text-aw-accent"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -128,7 +128,7 @@ function FingerprintIcon() {
 function BotIcon() {
   return (
     <svg
-      className="h-7 w-7 text-[#6ee7b7]"
+      className="h-7 w-7 text-aw-accent"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
