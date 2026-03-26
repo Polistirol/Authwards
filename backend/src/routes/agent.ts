@@ -3,8 +3,10 @@ import { Router } from "express";
 
 import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
 import * as db from "../services/db.js";
+import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 import { createAgentDid } from "../services/did.js";
 import { deriveAgentKeypair } from "../services/keyDerivation.js";
+import { decryptUserWalletSecret } from "../services/agentCrypto.js";
 import { buildAgentSnippetPayload } from "../services/agentSnippetProviders.js";
 import {
   createPermitOnChain,
@@ -101,17 +103,23 @@ router.post("/create", requireJwt, async (req, res) => {
     }
     const permitExpiresAtMs = parsePermitExpiresAtMs(body);
 
-    const taskType = req.body?.taskType as AgentTaskType | undefined;
-    const taskConfigBody = req.body?.taskConfig as
-      | { shipmentId?: string; recipientAddress?: string; amountNanos?: number }
-      | undefined;
-
-    if (taskType === "shipment_monitor" && !taskConfigBody?.shipmentId) {
+    const rawTask = req.body?.taskType as string | undefined;
+    if (rawTask === "shipment_monitor") {
       res.status(400).json({
-        error: "taskType shipment_monitor requires taskConfig.shipmentId",
+        error: "taskType shipment_monitor is not supported by the core API",
       });
       return;
     }
+    if (rawTask && rawTask !== "balance_monitor") {
+      res.status(400).json({
+        error: 'Unsupported taskType; use "balance_monitor" or omit',
+      });
+      return;
+    }
+    const taskType: AgentTaskType = "balance_monitor";
+    const taskConfigBody = req.body?.taskConfig as
+      | { recipientAddress?: string; amountNanos?: number }
+      | undefined;
 
     const rawName = req.body?.name;
     const rawDesc = req.body?.description;
@@ -131,24 +139,56 @@ router.post("/create", requireJwt, async (req, res) => {
       res.status(400).json({ error: "Missing user walletAddress: complete OAuth onboarding first" });
       return;
     }
+    if (!user.encryptedPrivateKey || !user.iv || !user.salt) {
+      res.status(400).json({
+        error:
+          "Delegated identities require an account with a server-managed wallet key (e.g. Google/GitHub/Telegram). Wallet-only login cannot create agent DIDs because the platform cannot sign on your behalf.",
+      });
+      return;
+    }
+
+    const ownerSeed = decryptUserWalletSecret(user);
+    const ownerSignerKeypair = Ed25519Keypair.fromSecretKey(ownerSeed);
+    const derivedOwnerAddress = ownerSignerKeypair.getPublicKey().toIotaAddress();
+    if (derivedOwnerAddress !== user.walletAddress) {
+      console.error(
+        "[agent/create] Decrypted wallet address mismatch vs db.walletAddress",
+        derivedOwnerAddress,
+        user.walletAddress,
+      );
+      res.status(500).json({ error: "Wallet key mismatch; contact support" });
+      return;
+    }
+
+    const ownerDid = user.did;
+    if (ownerDid !== jwtUser.did) {
+      console.warn(
+        "[agent/create] JWT did differs from db user.did — using db as source of truth for chain + row",
+        { jwtDid: jwtUser.did, dbDid: ownerDid },
+      );
+    }
 
     const idx = user.nextAgentIndex ?? 0;
     const { keypair } = deriveAgentKeypair(user.providerId, user.walletAddress, idx);
 
     const { did: agentDid, walletAddress, DIDCreationTx } = await createAgentDid({
       agentKeypair: keypair,
-      ownerDid: jwtUser.did,
+      ownerDid,
+      ownerSignerKeypair,
     });
 
     const agentToken = `agt_${crypto.randomBytes(24).toString("hex")}`;
 
     let taskConfig: AgentTaskConfig | undefined;
-    if (taskType === "shipment_monitor" && taskConfigBody?.shipmentId) {
+    if (
+      taskConfigBody &&
+      (taskConfigBody.recipientAddress !== undefined || taskConfigBody.amountNanos !== undefined)
+    ) {
       taskConfig = {
-        shipmentId: taskConfigBody.shipmentId,
         action: "release_payment",
-        recipientAddress: taskConfigBody.recipientAddress,
-        amountNanos: taskConfigBody.amountNanos,
+        recipientAddress:
+          typeof taskConfigBody.recipientAddress === "string" ? taskConfigBody.recipientAddress : undefined,
+        amountNanos: typeof taskConfigBody.amountNanos === "number" ? taskConfigBody.amountNanos : undefined,
       };
     }
 
@@ -156,7 +196,7 @@ router.post("/create", requireJwt, async (req, res) => {
       agentDid,
       name,
       description,
-      ownerDid: jwtUser.did,
+      ownerDid,
       ownerProviderId: jwtUser.providerId,
       ownerProviderType: jwtUser.providerType,
       walletAddress,
@@ -181,9 +221,13 @@ router.post("/create", requireJwt, async (req, res) => {
     let permitObjectId: string | null = null;
     if (isPermitContractConfigured()) {
       try {
+        console.log(
+          `[agent/create] AgentPermit create_permit args (UTF-8): agent_did=${agentDid} owner_did=${ownerDid}`,
+        );
         const created = await createPermitOnChain({
           agentDid,
-          ownerDid: jwtUser.did,
+          ownerDid,
+          ownerKeypair: ownerSignerKeypair,
           maxPerTx: BigInt(limits.maxPerTx),
           maxPerDay: BigInt(limits.maxPerDay),
           expiresAtMs: permitExpiresAtMs,
@@ -191,7 +235,7 @@ router.post("/create", requireJwt, async (req, res) => {
         permitObjectId = created.permitObjectId;
         await db.updateAgentByDid(agentDid, { permitObjectId });
         console.log(
-          `[agent/create] AgentPermit on-chain created: ${permitObjectId} (tx ${created.txHash})`,
+          `[agent/create] AgentPermit on-chain created (user-paid gas): ${permitObjectId} (tx ${created.txHash})`,
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -269,11 +313,22 @@ router.post("/:agentDid/activate", requireJwt, async (req, res) => {
     }
 
     if (isPermitContractConfigured() && a.permitObjectId) {
-      const react = await reactivatePermitOnChain(a.permitObjectId);
-      if (!react.success) {
-        console.warn("[agent/activate] reactivate_permit on-chain:", react.error ?? "unknown");
-      } else if (react.txHash) {
-        console.log(`[agent/activate] AgentPermit reactivate_permit on-chain tx: ${react.txHash}`);
+      const ownerUser = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
+      if (ownerUser?.encryptedPrivateKey && ownerUser.iv && ownerUser.salt) {
+        try {
+          const ownerSeed = decryptUserWalletSecret(ownerUser);
+          const ownerKp = Ed25519Keypair.fromSecretKey(ownerSeed);
+          const react = await reactivatePermitOnChain(a.permitObjectId, ownerKp);
+          if (!react.success) {
+            console.warn("[agent/activate] reactivate_permit on-chain:", react.error ?? "unknown");
+          } else if (react.txHash) {
+            console.log(`[agent/activate] AgentPermit reactivate_permit on-chain tx: ${react.txHash}`);
+          }
+        } catch (e) {
+          console.warn("[agent/activate] reactivate_permit on-chain failed:", e);
+        }
+      } else {
+        console.warn("[agent/activate] skip on-chain reactivate: user wallet key not on server");
       }
     }
 

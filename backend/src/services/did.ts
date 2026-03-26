@@ -5,7 +5,9 @@ import { decodeIotaPrivateKey } from "@iota/iota-sdk/cryptography";
 import { requestIotaFromFaucetV0 } from "@iota/iota-sdk/faucet";
 import type { IotaTransactionBlockResponse } from "@iota/iota-sdk/client";
 import { IotaClient } from "@iota/iota-sdk/client";
+import { Transaction } from "@iota/iota-sdk/transactions";
 import { getMasterAddress, getMasterKeypair } from "./masterWallet.js";
+import { sponsoredExecute, wrapIdentityPtbForFromKind } from "./sponsoredTx.js";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 import { Ed25519KeypairSigner } from "@iota/iota-interaction-ts/node/test_utils/ed_25519_keypair_signer.js";
 import {
@@ -160,10 +162,9 @@ async function getChainId(client: IotaClient): Promise<string> {
 }
 
 /**
- * Creates a DID on IOTA. `publicKey` is the IOTA SDK `Ed25519Keypair` (full key):
- * public material goes into the DID document; private material is only in memory to sign `createIdentity`.
- * Gas: **master wallet** signs and executes the tx (`IdentityClient` = master). The DID document contains the user's VM.
- * (`withSender`+`withGasOwner` txs need two signatures; `buildAndExecute` provides one — not used here.)
+ * Creates a DID on IOTA (OAuth onboarding). VM = user key; sender = user wallet; gas sponsored by master.
+ * Uses PTB from identity-wasm + {@link sponsoredExecute} (master-sponsored gas). The
+ * `withSponsor` + `buildAndExecute` path can produce "Invalid user signature" on the RPC — avoid it.
  */
 export async function createDid(
   publicKey: Ed25519Keypair,
@@ -175,7 +176,7 @@ export async function createDid(
   walletAddress: string;
   privateKeyHex: string;
   mnemonic: string | null;
-  didGasMode: "master_payer";
+  didGasMode: "sponsored";
 }> {
   ensureWasm();
   const walletAddress = publicKey.getPublicKey().toIotaAddress();
@@ -185,8 +186,7 @@ export async function createDid(
 
   const iotaClient = new IotaClient({ url: getNodeUrl() });
   const storage = new Storage(new JwkMemStore(), new KeyIdMemStore());
-  const masterKp = getMasterKeypair();
-  const identityClient = await createIdentityClientFromKeypair(iotaClient, masterKp, {
+  const identityClient = await createIdentityClientFromKeypair(iotaClient, publicKey, {
     fundFromFaucet: false,
   });
   const networkId = await getChainId(iotaClient);
@@ -194,33 +194,35 @@ export async function createDid(
   const unpublished = new IotaDocument(networkId);
   await attachExternalEd25519Method(storage, unpublished, privateJwk, "#key-1");
 
-  console.log(
-    "[did] User DID creation: gas mode = master_payer (option C: sign+gas from master, VM = user key)",
-  );
+  console.log("[did] User DID creation: sponsored gas (sender = user wallet, VM = user key)");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const txb: any = identityClient.createIdentity(unpublished).finish();
-  const { output: identity, response: rawRes } = await txb
-    .withGasBudget(getDidGasBudget())
-    .withGasOwner(getMasterAddress())
-    .buildAndExecute(identityClient);
-  const tx = unwrapTxResponse(rawRes);
+  const txb: any = identityClient.createIdentity(unpublished).finish().withSender(walletAddress);
+  const createIdentityTx = txb.transaction;
+  const ptbBytes = await createIdentityTx.buildProgrammableTransaction(identityClient.readOnly());
+  const sdkTx = Transaction.fromKind(wrapIdentityPtbForFromKind(ptbBytes));
+  const result = await sponsoredExecute(sdkTx, publicKey, iotaClient, { gasBudget: getDidGasBudget() });
+  if (!result.effects) {
+    throw new Error("DID creation transaction returned no effects");
+  }
+  const identity = await createIdentityTx.apply(result.effects as never, identityClient.readOnly());
   const doc = identity.didDocument();
   const did = doc.id().toString();
   const didDocument = doc.toJSON() as Record<string, unknown>;
   return {
     did,
     didDocument,
-    DIDCreationTx: tx.digest,
+    DIDCreationTx: result.digest,
     walletAddress,
     privateKeyHex,
     mnemonic,
-    didGasMode: "master_payer",
+    didGasMode: "sponsored",
   };
 }
 
 /**
- * DID for users with only the browser extension wallet: VM uses the Ed25519 public key
- * verified from the signature (no seed on the backend).
+ * DID for wallet-only login: no private key on the server — cannot dual-sign as the user.
+ * IdentityClient uses the master keypair; sender remains the platform (controller caps on master).
+ * Use OAuth/Telegram onboarding for user-owned controller objects.
  */
 export async function createDidForWalletOwner(publicKey: PublicKey): Promise<{
   did: string;
@@ -249,7 +251,7 @@ export async function createDidForWalletOwner(publicKey: PublicKey): Promise<{
   await attachPublicOnlyEd25519Method(storage, unpublished, publicJwk, "#key-1");
 
   console.log(
-    "[did] Wallet-login DID creation: gas mode = master_payer, VM = wallet public key (no private key on server)",
+    "[did] Wallet-login DID creation: master sender (no user key on server); VM = wallet public key only",
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txb: any = identityClient.createIdentity(unpublished).finish();
@@ -269,19 +271,31 @@ export async function createDidForWalletOwner(publicKey: PublicKey): Promise<{
   };
 }
 
-/** Agent: agent VM + user controller; signing and gas from master (option C). */
+const AGENT_DID_TX_OPTS = {
+  showEffects: true,
+  showObjectChanges: true,
+  showEvents: true,
+  showBalanceChanges: true,
+} as const;
+
+/**
+ * Agent DID: VM = agent key; controller = owner DID.
+ * **Gas is paid by the logged-in user** (same as signing): `signAndExecuteTransaction` with `ownerSignerKeypair` —
+ * not sponsored by the master. Onboarding DID creation ({@link createDid}) stays master-sponsored.
+ */
 export async function createAgentDid(params: {
   agentKeypair: Ed25519Keypair;
   ownerDid: string;
+  /** User's main wallet keypair (same address as their DID / `walletAddress`). Must NOT be the master key. */
+  ownerSignerKeypair: Ed25519Keypair;
 }): Promise<{ did: string; didDocument: Record<string, unknown>; walletAddress: string; DIDCreationTx: string }> {
   ensureWasm();
-  const { agentKeypair, ownerDid } = params;
+  const { agentKeypair, ownerDid, ownerSignerKeypair } = params;
   const walletAddress = agentKeypair.getPublicKey().toIotaAddress();
 
   const iotaClient = new IotaClient({ url: getNodeUrl() });
   const storage = new Storage(new JwkMemStore(), new KeyIdMemStore());
-  const masterKp = getMasterKeypair();
-  const identityClient = await createIdentityClientFromKeypair(iotaClient, masterKp, {
+  const identityClient = await createIdentityClientFromKeypair(iotaClient, ownerSignerKeypair, {
     fundFromFaucet: false,
   });
   const networkId = await getChainId(iotaClient);
@@ -291,22 +305,29 @@ export async function createAgentDid(params: {
   unpublished.setController([ownerIotaDid]);
   await attachExternalEd25519Method(storage, unpublished, agentJwk, "#key-1");
 
-  console.log(
-    "[did] Agent DID creation: gas mode = master_payer (option C: sign+gas from master, VM = agent key)",
-  );
+  console.log("[did] Agent DID creation: sender = owner, gas from owner wallet (user-paid tx)");
+  const ownerAddress = ownerSignerKeypair.getPublicKey().toIotaAddress();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const txb: any = identityClient.createIdentity(unpublished).finish();
-  const { output: identity, response: rawRes } = await txb
-    .withGasBudget(getDidGasBudget())
-    .withGasOwner(getMasterAddress())
-    .buildAndExecute(identityClient);
-  const tx = unwrapTxResponse(rawRes);
+  const txb: any = identityClient.createIdentity(unpublished).finish().withSender(ownerAddress);
+  const createIdentityTx = txb.transaction;
+  const ptbBytes = await createIdentityTx.buildProgrammableTransaction(identityClient.readOnly());
+  const sdkTx = Transaction.fromKind(wrapIdentityPtbForFromKind(ptbBytes));
+  sdkTx.setGasBudget(getDidGasBudget());
+  const result = await iotaClient.signAndExecuteTransaction({
+    transaction: sdkTx,
+    signer: ownerSignerKeypair,
+    options: AGENT_DID_TX_OPTS,
+  });
+  if (!result.effects) {
+    throw new Error("Agent DID creation transaction returned no effects");
+  }
+  const identity = await createIdentityTx.apply(result.effects as never, identityClient.readOnly());
   const doc = identity.didDocument();
   return {
     did: doc.id().toString(),
     didDocument: doc.toJSON() as Record<string, unknown>,
     walletAddress,
-    DIDCreationTx: tx.digest,
+    DIDCreationTx: result.digest,
   };
 }
 
