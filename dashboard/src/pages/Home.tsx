@@ -35,7 +35,7 @@ export default function Home() {
             Authwards
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#a8abb8]">
-            Your Google identity becomes an IOTA DID. Delegate autonomous agents with
+            Your Google identity becomes an IOTA DID. Create delegate identities with
             verifiable on-chain permissions.
           </p>
           <button
@@ -72,9 +72,9 @@ export default function Home() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
               <BotIcon />
             </div>
-            <h2 className="text-lg font-semibold text-white">Delegated agents</h2>
+            <h2 className="text-lg font-semibold text-white">Delegates</h2>
             <p className="mt-2 text-sm leading-relaxed text-[#a8abb8]">
-              Create agents with permission profiles and track every action on-chain.
+              Create delegates with permission profiles and track every action on-chain.
             </p>
           </article>
         </section>

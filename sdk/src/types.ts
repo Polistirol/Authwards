@@ -21,8 +21,10 @@ export type User = {
 export type AgentStatus = "created" | "pending_activation" | "active" | "revoked";
 
 export type AgentTaskConfig = {
-  shipmentId?: string;
   action?: string;
+  /** Spend amount in nanos (when used with backend bridge). */
+  amountNanos?: number;
+  recipientAddress?: string;
 };
 
 export type Agent = {

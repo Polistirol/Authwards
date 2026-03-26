@@ -1,6 +1,5 @@
+import { NANOS_PER_IOTA_BI } from "../constants.js";
 import type { DbAgent, PermissionProfile } from "../types/db.js";
-
-const NANOS_PER_IOTA = 1_000_000_000n;
 
 type LimitFields = Pick<DbAgent, "permissionProfile" | "permitMaxPerTxIota" | "permitMaxPerDayIota">;
 
@@ -12,9 +11,10 @@ function getPermissionLimitsLegacy(profile: PermissionProfile): {
     case "readonly":
       return { maxPerTx: 0n, maxPerDay: 0n };
     case "low_value":
-      return { maxPerTx: 50_000_000n, maxPerDay: 500_000_000n };
+      // 5 / 20 whole IOTA (nanos)
+      return { maxPerTx: 5n * NANOS_PER_IOTA_BI, maxPerDay: 20n * NANOS_PER_IOTA_BI };
     case "full_access":
-      return { maxPerTx: 1_000_000_000n, maxPerDay: 5_000_000_000n };
+      return { maxPerTx: 1000n * NANOS_PER_IOTA_BI, maxPerDay: 10000n * NANOS_PER_IOTA_BI };
     case "custom":
       return { maxPerTx: 0n, maxPerDay: 0n };
     default:
@@ -37,8 +37,8 @@ export function getPermissionLimits(
   const day = agent.permitMaxPerDayIota?.trim();
   if (tx && day) {
     try {
-      const maxPerTx = BigInt(tx) * NANOS_PER_IOTA;
-      const maxPerDay = BigInt(day) * NANOS_PER_IOTA;
+      const maxPerTx = BigInt(tx) * NANOS_PER_IOTA_BI;
+      const maxPerDay = BigInt(day) * NANOS_PER_IOTA_BI;
       return { maxPerTx, maxPerDay };
     } catch {
       /* fall through */

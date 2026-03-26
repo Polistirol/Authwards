@@ -1,10 +1,20 @@
 import { IotaClient } from "@iota/iota-sdk/client";
+import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 import { Transaction } from "@iota/iota-sdk/transactions";
 
+import { wholeIotaToNanos } from "../constants.js";
 import { getMasterKeypair } from "./masterWallet.js";
 import type { PermissionProfile } from "../types/db.js";
 
-const NANOS_PER_IOTA = 1_000_000_000n;
+/** Gas budget for user-signed AgentPermit txs (create / reactivate / revoke). */
+export const PERMIT_TX_GAS_BUDGET = 50_000_000n;
+
+const USER_PERMIT_TX_OPTS = {
+  showEffects: true,
+  showEvents: true,
+  showObjectChanges: true,
+  showBalanceChanges: true,
+} as const;
 
 /** Error codes from `iota_auth::agent_permit` (must match deployed Move). */
 export const PERMIT_ABORT = {
@@ -55,9 +65,6 @@ export function permissionProfileToOnChainIotaLimits(profile: PermissionProfile)
   }
 }
 
-function iotaWholeToNanos(iota: bigint): bigint {
-  return iota * NANOS_PER_IOTA;
-}
 
 function utf8Bytes(s: string): number[] {
   return [...Buffer.from(s, "utf8")];
@@ -106,9 +113,15 @@ function extractPermitIdFromEvents(
 }
 
 export type CreatePermitParams = {
+  /** Agent DID string (UTF-8), same as on-chain identity / db `agents.agentDid`. */
   agentDid: string;
+  /** Human-owner DID string (UTF-8), must match db `users.did` for this owner. */
   ownerDid: string;
+  /** Owner wallet keypair — signs and pays gas for `create_permit`. */
+  ownerKeypair: Ed25519Keypair;
+  /** Whole IOTA (integer); converted to nanos for Move `create_permit`. */
   maxPerTx: bigint;
+  /** Whole IOTA (integer); converted to nanos for Move `create_permit`. */
   maxPerDay: bigint;
   expiresAtMs: bigint;
 };
@@ -121,16 +134,15 @@ export async function createPermitOnChain(params: CreatePermitParams): Promise<{
   if (!packageId) throw new Error("AGENT_PERMIT_PACKAGE_ID not set");
 
   const client = new IotaClient({ url: getNodeUrl() });
-  const signer = getMasterKeypair();
   const tx = new Transaction();
-  tx.setGasBudgetIfNotSet(50_000_000n);
+  tx.setGasBudget(PERMIT_TX_GAS_BUDGET);
   tx.moveCall({
     target: `${packageId}::agent_permit::create_permit`,
     arguments: [
       tx.pure.vector("u8", utf8Bytes(params.agentDid)),
       tx.pure.vector("u8", utf8Bytes(params.ownerDid)),
-      tx.pure.u64(iotaWholeToNanos(params.maxPerTx)),
-      tx.pure.u64(iotaWholeToNanos(params.maxPerDay)),
+      tx.pure.u64(wholeIotaToNanos(params.maxPerTx)),
+      tx.pure.u64(wholeIotaToNanos(params.maxPerDay)),
       tx.pure.u64(params.expiresAtMs),
       tx.object.clock(),
     ],
@@ -138,8 +150,8 @@ export async function createPermitOnChain(params: CreatePermitParams): Promise<{
 
   const result = await client.signAndExecuteTransaction({
     transaction: tx,
-    signer,
-    options: TX_OPTS,
+    signer: params.ownerKeypair,
+    options: USER_PERMIT_TX_OPTS,
   });
 
   const digest = result.digest;
@@ -161,7 +173,10 @@ export type AuthorizeSpendResult =
   | { success: true; txHash: string }
   | { success: false; error: string; txHash?: string; networkError?: boolean };
 
-/** `amountNanos` as in the contract (same unit as the agent transaction). */
+/**
+ * `amountNanos` as in the contract (same unit as the agent transaction).
+ * Move `authorize_spend` does not require `sender == owner`; platform (master) submits the tx.
+ */
 export async function authorizeSpendOnChain(
   permitObjectId: string,
   amountNanos: bigint,
@@ -203,7 +218,10 @@ export async function authorizeSpendOnChain(
   }
 }
 
-export async function reactivatePermitOnChain(permitObjectId: string): Promise<{
+export async function reactivatePermitOnChain(
+  permitObjectId: string,
+  ownerKeypair: Ed25519Keypair,
+): Promise<{
   success: boolean;
   txHash?: string;
   error?: string;
@@ -215,9 +233,8 @@ export async function reactivatePermitOnChain(permitObjectId: string): Promise<{
 
   try {
     const client = new IotaClient({ url: getNodeUrl() });
-    const signer = getMasterKeypair();
     const tx = new Transaction();
-    tx.setGasBudgetIfNotSet(50_000_000n);
+    tx.setGasBudget(PERMIT_TX_GAS_BUDGET);
     tx.moveCall({
       target: `${packageId}::agent_permit::reactivate_permit`,
       arguments: [tx.object(permitObjectId)],
@@ -225,8 +242,8 @@ export async function reactivatePermitOnChain(permitObjectId: string): Promise<{
 
     const result = await client.signAndExecuteTransaction({
       transaction: tx,
-      signer,
-      options: TX_OPTS,
+      signer: ownerKeypair,
+      options: USER_PERMIT_TX_OPTS,
     });
 
     const st = result.effects?.status;
@@ -244,7 +261,10 @@ export async function reactivatePermitOnChain(permitObjectId: string): Promise<{
   }
 }
 
-export async function revokePermitOnChain(permitObjectId: string): Promise<{
+export async function revokePermitOnChain(
+  permitObjectId: string,
+  ownerKeypair: Ed25519Keypair,
+): Promise<{
   success: boolean;
   txHash?: string;
   error?: string;
@@ -256,9 +276,8 @@ export async function revokePermitOnChain(permitObjectId: string): Promise<{
 
   try {
     const client = new IotaClient({ url: getNodeUrl() });
-    const signer = getMasterKeypair();
     const tx = new Transaction();
-    tx.setGasBudgetIfNotSet(50_000_000n);
+    tx.setGasBudget(PERMIT_TX_GAS_BUDGET);
     tx.moveCall({
       target: `${packageId}::agent_permit::revoke_permit`,
       arguments: [tx.object(permitObjectId)],
@@ -266,8 +285,8 @@ export async function revokePermitOnChain(permitObjectId: string): Promise<{
 
     const result = await client.signAndExecuteTransaction({
       transaction: tx,
-      signer,
-      options: TX_OPTS,
+      signer: ownerKeypair,
+      options: USER_PERMIT_TX_OPTS,
     });
 
     const st = result.effects?.status;
@@ -319,11 +338,15 @@ function u64Field(v: unknown): bigint {
   return 0n;
 }
 
+/** On-chain permit fields: u64 amounts are nanos (same as Move struct). */
 export type PermitInfo = {
   agentDid: string;
   ownerDid: string;
+  /** Nanos (decimal string). */
   maxPerTx: string;
+  /** Nanos (decimal string). */
   maxPerDay: string;
+  /** Nanos (decimal string). */
   spentToday: string;
   expiresAt: string;
   isActive: boolean;

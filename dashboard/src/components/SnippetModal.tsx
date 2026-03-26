@@ -9,6 +9,8 @@ import { createPortal } from "react-dom";
 
 import type { AgentStatus } from "../sdk";
 
+import { IconCheck, IconClipboard } from "./icons";
+
 type SnippetProviderMeta = {
   label: string;
   description: string;
@@ -73,26 +75,6 @@ function IconDownload({ className = "h-5 w-5" }: { className?: string }) {
         strokeLinejoin="round"
         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
       />
-    </svg>
-  );
-}
-
-function IconClipboard({ className = "h-5 w-5" }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-      />
-    </svg>
-  );
-}
-
-function IconCheck({ className = "h-5 w-5" }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   );
 }
@@ -345,14 +327,14 @@ export default function SnippetModal({
 
           {pending ? (
             <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-              This agent is not yet activated. Activate it from the dashboard with
-              &quot;Activate Agent&quot;; then connect your workflow using the files below.
+              This delegate is not yet activated. Activate it from the dashboard with
+              &quot;Activate delegate&quot;; then connect your workflow using the files below.
             </div>
           ) : null}
 
           <div className="mt-4 space-y-3 rounded-xl border border-[#2a2d3a] bg-[#161821] p-4">
             <div>
-              <p className="text-xs uppercase text-slate-500">Agent DID</p>
+              <p className="text-xs uppercase text-slate-500">Delegate DID</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <code className="break-all text-sm text-[#6ee7b7]">{agentDid}</code>
                 <button
@@ -366,12 +348,12 @@ export default function SnippetModal({
             </div>
             {data?.agentName ? (
               <div>
-                <p className="text-xs uppercase text-slate-500">Agent name</p>
+                <p className="text-xs uppercase text-slate-500">Delegate name</p>
                 <p className="mt-1 text-sm font-medium text-white">{data.agentName}</p>
               </div>
             ) : null}
             <div>
-              <p className="text-xs uppercase text-slate-500">Agent token</p>
+              <p className="text-xs uppercase text-slate-500">Delegate token</p>
               <div className="relative mt-1 flex items-start gap-2">
                 <div className="min-h-[1.5rem] min-w-0 flex-1 rounded-lg border border-[#2a2d3a] bg-[#0a0b0f] px-3 py-2">
                   {data?.agentToken ? (

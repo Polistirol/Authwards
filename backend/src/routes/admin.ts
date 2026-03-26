@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 
+import { nanosToIota } from "../constants.js";
 import { mergeDbInitIntoExisting, readDb, replaceDbFromPayload, resetDbFromInit } from "../services/db.js";
 import { getMasterAddress, getMasterBalanceNanos } from "../services/masterWallet.js";
 
@@ -33,8 +34,9 @@ router.get("/master-status", async (_req, res) => {
     const nanos = await getMasterBalanceNanos();
     res.json({
       address: getMasterAddress(),
+      balanceNanos: nanos.toString(),
+      balanceIota: nanosToIota(nanos),
       balance: nanos.toString(),
-      balanceIota: Number(nanos) / 1e9,
       airdropEnabled: process.env.WELCOME_AIRDROP_ENABLED?.toLowerCase() === "true",
       airdropAmount: process.env.WELCOME_AIRDROP_AMOUNT ?? "0",
     });
@@ -45,7 +47,7 @@ router.get("/master-status", async (_req, res) => {
 });
 
 /**
- * Merges `db_init.json` into existing `db.json`: only appends shipments with new `id` values.
+ * Legacy merge endpoint (no-op): shipments no longer live in core `db.json`.
  * Requires `DEV_ACTION_SECRET` + `X-Dev-Action-Secret` or `Authorization: Bearer`.
  */
 router.post("/merge-db-init", async (req, res) => {
@@ -93,7 +95,7 @@ router.post("/reset-db-from-init", async (req, res) => {
 });
 
 /**
- * Reads full normalized `db.json` (users, agents, agentLogs, shipments).
+ * Reads full normalized `db.json` (users, agents, agentLogs).
  * Requires `DEV_ACTION_SECRET` + auth header.
  */
 router.get("/db-json", async (req, res) => {
@@ -138,7 +140,6 @@ router.put("/db-json", async (req, res) => {
         users: shape.users.length,
         agents: shape.agents.length,
         agentLogs: shape.agentLogs.length,
-        shipments: shape.shipments.length,
       },
     });
   } catch (e) {

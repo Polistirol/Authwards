@@ -51,10 +51,8 @@ export function getAllowedFrontendOrigins(): string[] {
 
   const allLocalhost = list.every((o) => /localhost|127\.0\.0\.1/.test(o));
   const sdkConsole = normalizeOrigin("http://localhost:5174");
-  const traceflowDemo = normalizeOrigin("http://localhost:5175");
   if (allLocalhost) {
     if (!list.includes(sdkConsole)) list.push(sdkConsole);
-    if (!list.includes(traceflowDemo)) list.push(traceflowDemo);
   }
 
   return list;

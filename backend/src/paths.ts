@@ -23,7 +23,7 @@ function resolveDbInitPath(): string {
   return besidePackage;
 }
 
-/** Committed template: demo shipments. Prefer `backend/db_init.json` so deploys that omit repo root still find it. */
+/** Committed template (`users`/`agents`/`agentLogs` empty). Prefer `backend/db_init.json` on minimal deploys. */
 export const DB_INIT_PATH = resolveDbInitPath();
 
 /** Writable DB. Override with `DB_PATH` on Railway (e.g. volume mount). Default: `backend/db.json`. */

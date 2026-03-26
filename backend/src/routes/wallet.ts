@@ -3,6 +3,7 @@ import { IotaClient } from "@iota/iota-sdk/client";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 import { Transaction } from "@iota/iota-sdk/transactions";
 
+import { iotaToNanos, nanosToIota } from "../constants.js";
 import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
 import * as db from "../services/db.js";
 import { decryptUserWalletSecret } from "../services/agentCrypto.js";
@@ -20,18 +21,20 @@ function getNodeUrl(): string {
   return url;
 }
 
-/** IOTA balance (nanos) for an address; public. */
+/** IOTA balance for an address; public. Amounts: `balanceNanos` / `balance` are chain nanos; `balanceIota` is display. */
 router.get("/balance/:address", async (req, res) => {
   try {
     const address = decodeURIComponent(req.params.address);
     const client = new IotaClient({ url: getNodeUrl() });
     const { totalBalance, coinType } = await client.getBalance({ owner: address });
-    const nanos = totalBalance;
+    const nanosBi = BigInt(totalBalance);
     res.json({
       address,
       coinType,
+      balanceNanos: totalBalance,
+      balanceIota: nanosToIota(nanosBi),
       balance: totalBalance,
-      nanos,
+      nanos: totalBalance,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Balance read error";
@@ -41,13 +44,15 @@ router.get("/balance/:address", async (req, res) => {
 
 /**
  * Transfers IOTA from the user's address (encrypted keypair in DB) to `to`.
- * Body: { to: string, amount: number } — `amount` in **nanos** (smallest unit).
+ * Body: { to: string, amount: number, unit?: "nanos" | "iota" } — default **nanos**; use `unit: "iota"` for whole/fractional IOTA.
  */
 router.post("/transfer", requireJwt, async (req, res) => {
   try {
     const jwtUser = req.user as JwtUserPayload;
     const to = req.body?.to;
     const amountRaw = req.body?.amount;
+    const unitRaw = req.body?.unit;
+    const unit = unitRaw === "iota" ? "iota" : "nanos";
     if (typeof to !== "string" || !to.trim()) {
       res.status(400).json({ error: "Body requires { to: string, amount: number }" });
       return;
@@ -56,13 +61,15 @@ router.post("/transfer", requireJwt, async (req, res) => {
       typeof amountRaw === "number"
         ? amountRaw
         : typeof amountRaw === "string"
-          ? parseInt(amountRaw, 10)
+          ? unit === "iota"
+            ? Number.parseFloat(amountRaw)
+            : parseInt(amountRaw, 10)
           : NaN;
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
-      res.status(400).json({ error: "amount must be a positive integer (nanos)" });
+      res.status(400).json({ error: "amount must be a positive number (nanos, or IOTA if unit is iota)" });
       return;
     }
-    const amountNanos = BigInt(Math.floor(amountNum));
+    const amountNanos = unit === "iota" ? iotaToNanos(amountNum) : BigInt(Math.floor(amountNum));
 
     const user = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
     if (!user?.encryptedPrivateKey || !user.iv || !user.salt) {
@@ -89,7 +96,9 @@ router.post("/transfer", requireJwt, async (req, res) => {
       txHash: result.digest,
       from,
       to: to.trim(),
-      amount: amountNum,
+      amountNanos: amountNanos.toString(),
+      amountIota: nanosToIota(amountNanos),
+      amount: Number(amountNanos),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Transfer error";

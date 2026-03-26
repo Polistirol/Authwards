@@ -1,5 +1,7 @@
 export type PermissionProfile = "readonly" | "custom" | "full_access" | "low_value";
 
+export type AgentStatus = "created" | "active" | "revoked" | "pending_activation";
+
 export type AuthProviderType = "google" | "github" | "wallet" | "telegram";
 
 export type DbUser = {
@@ -11,60 +13,64 @@ export type DbUser = {
   did: string;
   didDocument: Record<string, unknown>;
   DIDCreationTx?: string;
+  didGasMode?: "master_payer" | "sponsored";
+  airdropTxHash?: string;
   walletAddress?: string;
   encryptedPrivateKey?: string;
   iv?: string;
   salt?: string;
+  nextAgentIndex?: number;
   createdAt: string;
 };
 
-export type AgentTaskType = "balance_monitor" | "shipment_monitor";
+export type AgentTaskType = "balance_monitor";
 
 export type AgentTaskConfig = {
-  shipmentId: string;
-  action: "release_payment";
+  action?: "release_payment";
+  recipientAddress?: string;
+  amountNanos?: number;
 };
 
 export type DbAgent = {
   agentDid: string;
+  name?: string;
+  description?: string;
   ownerDid: string;
   ownerProviderId: string;
   ownerProviderType: AuthProviderType;
   permissionProfile: PermissionProfile;
+  permitMaxPerTxIota?: string;
+  permitMaxPerDayIota?: string;
+  permitExpiresAtMs?: string;
   walletAddress?: string;
-  encryptedPrivateKey: string;
-  iv: string;
-  salt: string;
+  DIDCreationTx?: string;
+  encryptedPrivateKey?: string;
+  iv?: string;
+  salt?: string;
+  agentToken?: string;
+  agentIndex?: number;
+  permitObjectId?: string | null;
+  status?: AgentStatus;
+  activatedAt?: string | null;
+  spentTodayNanos?: string;
+  spentTodayDate?: string;
   createdAt: string;
-  active: boolean;
+  active?: boolean;
   taskType?: AgentTaskType;
   taskConfig?: AgentTaskConfig;
 };
 
-export type DbShipment = {
-  id: string;
-  product: string;
-  origin: string;
-  destination: string;
-  status: string;
-  supplier: string;
-  paymentAmount: number;
-  createdAt: string;
-};
-
-/** Allineato al backend; `type`/`data` usati dal runtime; campi legacy opzionali. */
 export type DbAgentLog = {
   agentDid: string;
   createdAt: string;
   message?: string;
-  meta?: unknown;
   type?: string;
   data?: unknown;
+  meta?: unknown;
 };
 
 export type DbShape = {
   users: DbUser[];
   agents: DbAgent[];
   agentLogs: DbAgentLog[];
-  shipments: DbShipment[];
 };

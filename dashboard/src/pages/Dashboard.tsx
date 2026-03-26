@@ -6,8 +6,34 @@ import { useAgent, useAuthwards } from "../sdk";
 import type { Agent, AgentStatus, CreateAgentResult, User } from "../sdk";
 import AgentCard from "../components/AgentCard";
 import FundAgentModal from "../components/FundAgentModal";
+import { IconArrowTopRightOnSquare, IconCheck, IconClipboard } from "../components/icons";
 import SnippetModal from "../components/SnippetModal";
 import TrustChain from "../components/TrustChain";
+
+function explorerAddressUrl(address: string, userDid: string): string {
+  const base = `https://explorer.iota.org/address/${encodeURIComponent(address)}`;
+  const m = userDid.match(/did:iota:([^:]+):/);
+  const net = m?.[1];
+  if (net && net !== "mainnet") {
+    return `${base}?network=${encodeURIComponent(net)}`;
+  }
+  return base;
+}
+
+/** DID document on-chain: last segment `0x...` → `/object/0x...` (+ network from DID). */
+function explorerDidObjectUrl(did: string): string | null {
+  const trimmed = did.trim();
+  const parts = trimmed.split(":");
+  const last = parts[parts.length - 1] ?? "";
+  if (!last.startsWith("0x") || last.length < 3) return null;
+  const base = `https://explorer.iota.org/object/${encodeURIComponent(last)}`;
+  const m = trimmed.match(/did:iota:([^:]+):/);
+  const net = m?.[1];
+  if (net && net !== "mainnet") {
+    return `${base}?network=${encodeURIComponent(net)}`;
+  }
+  return base;
+}
 
 function highlightJsonText(text: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -184,7 +210,7 @@ export default function Dashboard() {
         (prev === "created" || prev === "pending_activation") &&
         cur === "active"
       ) {
-        setToast("Agent activated!");
+        setToast("Delegate activated!");
         window.setTimeout(() => setToast(null), 6000);
       }
       prevStatusRef.current.set(a.agentDid, cur);
@@ -231,9 +257,10 @@ export default function Dashboard() {
       try {
         const res = await fetch(url);
         if (!res.ok || cancelled) return;
-        const json = (await res.json()) as { balance?: string };
-        if (!cancelled && json.balance !== undefined) {
-          setUserBalanceNanos(json.balance);
+        const json = (await res.json()) as { balanceNanos?: string; balance?: string };
+        const nanos = json.balanceNanos ?? json.balance;
+        if (!cancelled && nanos !== undefined) {
+          setUserBalanceNanos(nanos);
         }
       } catch {
         if (!cancelled) setUserBalanceNanos(null);
@@ -323,7 +350,9 @@ export default function Dashboard() {
     return <Navigate to="/" replace />;
   }
 
-  const explorerUrl = `https://explorer.iota.org/testnet/did/${encodeURIComponent(did)}`;
+  const didExplorerHref =
+    explorerDidObjectUrl(did) ??
+    `https://explorer.iota.org/testnet/did/${encodeURIComponent(did)}`;
 
   return (
     <div className="min-h-screen bg-[#0a0b0f] text-[#e2e4ed]">
@@ -376,10 +405,26 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => void copyWallet()}
-                      className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-xs text-[#6ee7b7] hover:bg-white/10"
+                      aria-label="Copy wallet address"
+                      title={walletCopied ? "Copied" : "Copy wallet address"}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
                     >
-                      {walletCopied ? "Copied" : "Copy"}
+                      {walletCopied ? (
+                        <IconCheck className="h-3.5 w-3.5 text-[#6ee7b7]" />
+                      ) : (
+                        <IconClipboard className="h-3.5 w-3.5" />
+                      )}
                     </button>
+                    <a
+                      href={explorerAddressUrl(user.walletAddress, did)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="View wallet on IOTA Explorer"
+                      title="Open address in IOTA Explorer"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+                    >
+                      <IconArrowTopRightOnSquare className="h-3.5 w-3.5" />
+                    </a>
                   </div>
                   <p className="mt-3 text-sm text-slate-300">
                     Balance:{" "}
@@ -404,31 +449,37 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => void copyDid()}
-                className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-xs text-[#6ee7b7] hover:bg-white/10"
+                aria-label="Copy DID"
+                title={didCopied ? "Copied" : "Copy DID"}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
               >
-                {didCopied ? "Copied" : "Copy"}
+                {didCopied ? (
+                  <IconCheck className="h-3.5 w-3.5 text-[#6ee7b7]" />
+                ) : (
+                  <IconClipboard className="h-3.5 w-3.5" />
+                )}
               </button>
+              <a
+                href={didExplorerHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View DID on IOTA Explorer"
+                title="Open DID object in IOTA Explorer"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+              >
+                <IconArrowTopRightOnSquare className="h-3.5 w-3.5" />
+              </a>
             </div>
             <DidDocumentBlock user={user} />
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex text-sm font-medium text-[#6ee7b7] underline-offset-4 hover:underline"
-            >
-              View on IOTA Explorer
-            </a>
           </div>
         </section>
 
         <section>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-white">
-                Delegated Identities
-              </h2>
+              <h2 className="text-lg font-semibold text-white">Delegates</h2>
               <p className="mt-1 max-w-xl text-sm text-slate-500">
-                Create identities for your agents and connect them to your preferred workflow.
+                Create delegate identities and connect them to your preferred workflow.
               </p>
             </div>
             <button
@@ -447,16 +498,16 @@ export default function Dashboard() {
               }}
               className="rounded-xl bg-[#6ee7b7] px-5 py-2.5 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
             >
-              New Delegated Identity
+              Create Delegate Identity
             </button>
           </div>
 
           {agentsLoading && agents.length === 0 ? (
-            <p className="mt-6 text-sm text-slate-500">Loading agents…</p>
+            <p className="mt-6 text-sm text-slate-500">Loading delegates…</p>
           ) : agents.length === 0 ? (
             <p className="mt-6 text-sm text-slate-500">
-              No delegates yet. Create a delegated agent identity and connect it to
-              n8n, a bot, or any service.
+              No delegates yet. Create a delegate identity and connect it to n8n, a bot,
+              or any service.
             </p>
           ) : (
             <div className="mt-6 space-y-6">
@@ -488,19 +539,19 @@ export default function Dashboard() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="new-agent-title"
+            aria-labelledby="new-delegate-title"
             className="flex max-h-[min(92vh,900px)] w-full max-w-[44.8rem] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#12141c] shadow-2xl"
           >
             <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
               <h2
-                id="new-agent-title"
+                id="new-delegate-title"
                 className={`text-lg font-semibold sm:text-xl ${
                   createStep === "pick" ? "text-white" : "text-[#6ee7b7]"
                 }`}
               >
                 {createStep === "pick"
-                  ? "New Delegated Identity"
-                  : "Agent identity created"}
+                  ? "Create Delegate Identity"
+                  : "Delegate identity created"}
               </h2>
               <button
                 type="button"
@@ -527,7 +578,7 @@ export default function Dashboard() {
                       type="text"
                       value={agentName}
                       onChange={(e) => setAgentName(e.target.value)}
-                      placeholder="e.g. Shipment monitor"
+                      placeholder="e.g. Balance monitor"
                       autoComplete="off"
                       className="mt-2 w-full rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-3 text-sm text-[#e2e4ed] placeholder:text-slate-600 focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
                     />
@@ -543,7 +594,7 @@ export default function Dashboard() {
                       id="agent-desc"
                       value={agentDescription}
                       onChange={(e) => setAgentDescription(e.target.value)}
-                      placeholder="Describe what this agent will do in your workflow…"
+                      placeholder="Describe what this delegate will do in your workflow…"
                       rows={3}
                       className="mt-2 w-full resize-y rounded-xl border border-[#2a2d3a] bg-[#0a0b0f] px-4 py-3 text-sm text-[#e2e4ed] placeholder:text-slate-600 focus:border-[#6ee7b7]/50 focus:outline-none focus:ring-1 focus:ring-[#6ee7b7]/30"
                     />
@@ -661,7 +712,7 @@ export default function Dashboard() {
                     onClick={() => void handleCreateAgent()}
                     className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {creating ? "Creating…" : "Create"}
+                    {creating ? "Creating…" : "Create delegate"}
                   </button>
                 </div>
               </>
@@ -681,14 +732,14 @@ export default function Dashboard() {
                     </p>
                   ) : null}
                   <p>
-                    <span className="text-slate-500">Agent DID</span>
+                    <span className="text-slate-500">Delegate DID</span>
                     <br />
                     <code className="break-all text-[#6ee7b7]">
                       {createResult.agentDid}
                     </code>
                   </p>
                   <p>
-                    <span className="text-slate-500">Agent wallet</span>
+                    <span className="text-slate-500">Delegate wallet</span>
                     <br />
                     <code className="break-all text-[#6ee7b7]">
                       {createResult.walletAddress}
@@ -701,12 +752,12 @@ export default function Dashboard() {
                   </p>
                   <p className="mt-1 text-sm text-slate-400">
                     Use{" "}
-                    <span className="font-semibold text-[#6ee7b7]">Activate Agent</span> on the
+                    <span className="font-semibold text-[#6ee7b7]">Activate delegate</span> on the
                     card when you are ready.
                   </p>
                   <p className="pt-2 text-slate-400">
-                    You can already copy the snippet to prepare your workflow; the agent will work
-                    after activation from the dashboard.
+                    You can already copy the snippet to prepare your workflow; the delegate will
+                    work after activation from the dashboard.
                   </p>
                 </div>
                 <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-end">

@@ -1,3 +1,5 @@
+import { nanosToIota } from "../constants.js";
+import type { CoinStruct } from "@iota/iota-sdk/client";
 import { IotaClient } from "@iota/iota-sdk/client";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 import { Transaction } from "@iota/iota-sdk/transactions";
@@ -61,10 +63,21 @@ export function getMasterAddress(): string {
   return getMasterKeypair().getPublicKey().toIotaAddress();
 }
 
+/** Chain balance in nanos. */
 export async function getMasterBalanceNanos(): Promise<bigint> {
   const client = new IotaClient({ url: getNodeUrl() });
   const { totalBalance } = await client.getBalance({ owner: getMasterAddress() });
   return BigInt(totalBalance);
+}
+
+/** IOTA gas coins owned by the master wallet (for sponsored transactions). */
+export async function getMasterGasCoins(client: IotaClient): Promise<CoinStruct[]> {
+  const owner = getMasterAddress();
+  const res = await client.getCoins({ owner, limit: 50 });
+  if (!res.data?.length) {
+    throw new Error("Master wallet has no gas coins");
+  }
+  return res.data;
 }
 
 const TX_OPTS = {
@@ -91,7 +104,7 @@ export async function logMasterWalletStatus(): Promise<void> {
   try {
     const addr = getMasterAddress();
     const nanos = await getMasterBalanceNanos();
-    const iota = Number(nanos) / 1e9;
+    const iota = nanosToIota(nanos);
     console.log(`[masterWallet] Master wallet loaded: ${addr} (balance: ${iota.toFixed(4)} IOTA / ${nanos} nanos)`);
   } catch (e) {
     console.warn("[masterWallet] Could not read master balance:", e);

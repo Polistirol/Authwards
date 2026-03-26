@@ -3,18 +3,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
-import type { AuthProviderType, DbAgent, DbAgentLog, DbShape, DbShipment, DbUser } from "../types/db.js";
+import type { AuthProviderType, DbAgent, DbAgentLog, DbShape, DbUser } from "../types/db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Repo root: `agent-runtime/src/services` → `../../../` */
-export const DB_PATH = path.resolve(__dirname, "../../../db.json");
+/** Same file as backend `db.json` (`packages/backend/db.json` from monorepo root). */
+export const DB_PATH = path.resolve(__dirname, "../../../backend/db.json");
 
 const emptyDb = (): DbShape => ({
   users: [],
   agents: [],
   agentLogs: [],
-  shipments: [],
 });
 
 function isAuthProviderType(v: unknown): v is AuthProviderType {
@@ -93,6 +92,9 @@ function normalizeDb(parsed: unknown): { shape: DbShape; migrated: boolean } {
   const usersRaw = Array.isArray(o.users) ? o.users : [];
   const agentsRaw = Array.isArray(o.agents) ? o.agents : [];
   let migrated = false;
+  if ("shipments" in o && o.shipments !== undefined) {
+    migrated = true;
+  }
   const users: DbUser[] = [];
   for (const u of usersRaw) {
     const r = migrateUserRecord(u);
@@ -110,7 +112,6 @@ function normalizeDb(parsed: unknown): { shape: DbShape; migrated: boolean } {
       users,
       agents,
       agentLogs: Array.isArray(o.agentLogs) ? (o.agentLogs as DbAgentLog[]) : [],
-      shipments: Array.isArray(o.shipments) ? (o.shipments as DbShipment[]) : [],
     },
     migrated,
   };
@@ -119,12 +120,7 @@ function normalizeDb(parsed: unknown): { shape: DbShape; migrated: boolean } {
 function needsDbRepair(parsed: unknown): boolean {
   if (!parsed || typeof parsed !== "object") return true;
   const o = parsed as Record<string, unknown>;
-  return (
-    !Array.isArray(o.users) ||
-    !Array.isArray(o.agents) ||
-    !Array.isArray(o.agentLogs) ||
-    !Array.isArray(o.shipments)
-  );
+  return !Array.isArray(o.users) || !Array.isArray(o.agents) || !Array.isArray(o.agentLogs);
 }
 
 export async function ensureDbFile(): Promise<void> {
@@ -237,17 +233,4 @@ export async function getAgentLogs(agentDid: string, limit = 50): Promise<DbAgen
   const filtered = db.agentLogs.filter((l) => l.agentDid === agentDid);
   filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return filtered.slice(0, limit);
-}
-
-export async function getShipment(shipmentId: string): Promise<DbShipment | undefined> {
-  const db = await readDb();
-  return db.shipments.find((s) => s.id === shipmentId);
-}
-
-export async function updateShipmentStatus(shipmentId: string, newStatus: string): Promise<void> {
-  const db = await readDb();
-  const s = db.shipments.find((x) => x.id === shipmentId);
-  if (!s) throw new Error(`Spedizione non trovata: ${shipmentId}`);
-  s.status = newStatus;
-  await writeDb(db);
 }

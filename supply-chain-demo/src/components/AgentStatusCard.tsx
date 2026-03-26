@@ -4,6 +4,7 @@ import type { Agent, AgentStatus } from "../../../sdk";
 import { useAgent, useAuthwards, useWallet } from "../../../sdk";
 import { explorerObjectUrl } from "../lib/explorer";
 import { nanosToIota, truncateDid } from "../lib/format";
+import { iotaToNanos } from "../lib/units";
 import { permissionCaps } from "../lib/permissions";
 import SnippetModal from "./SnippetModal";
 
@@ -62,7 +63,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
     if (!agent.walletAddress) return;
     try {
       const r = await getBalance(agent.walletAddress);
-      setBalanceNanos(r.nanos ?? r.balance);
+      setBalanceNanos(r.balanceNanos ?? r.nanos ?? r.balance);
     } catch {
       setBalanceNanos(null);
     }
@@ -89,7 +90,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
     }
     if (!agent.walletAddress) return;
     try {
-      const nanos = Math.round(n * 1e9);
+      const nanos = Number(iotaToNanos(n));
       await transferToAgent(agent.walletAddress, nanos);
       setFundOpen(false);
       void refreshBalance();

@@ -33,7 +33,7 @@ export type CreateAgentInput = {
   /** Unix ms timestamp; 0 or omit = no expiry. */
   permitExpiresAtMs?: number | null;
   taskType?: string;
-  taskConfig?: { shipmentId: string; action?: string };
+  taskConfig?: { recipientAddress?: string; amountNanos?: number; action?: string };
 };
 
 export type UseAgentResult = {

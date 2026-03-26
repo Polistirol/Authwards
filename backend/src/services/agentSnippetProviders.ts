@@ -19,14 +19,19 @@ function escapeForDoubleQuotes(s: string): string {
 
 /** Example JSON body for n8n transact node (user should replace recipient address). */
 const N8N_TRANSACT_JSON_BODY =
-  '{"to":"REPLACE_WITH_RECIPIENT_IOTA_ADDRESS","amount":5,"memo":"Payment for invoice #123"}';
+  '{"to":"REPLACE_WITH_RECIPIENT_IOTA_ADDRESS","amount":5,"unit":"iota","memo":"Payment for invoice #123"}';
 
-/** Full GET /agent/:did/snippet payload with downloadable provider bundles. */
+/**
+ * Full GET /agent/:did/snippet payload with downloadable provider bundles.
+ * `platformUrl` is the backend base URL passed in from the route (see agent.ts: `process.env.BACKEND_URL` or localhost).
+ */
 export function buildAgentSnippetPayload(agent: DbAgent, platformUrl: string) {
   const agentToken = agent.agentToken ?? "";
   const agentDid = agent.agentDid;
   const agentName = (agent.name && agent.name.trim()) || "Authward Agent";
   const safeName = safeFileNameSegment(agentName);
+  /** Download filenames: awt_<delegate_name>.ext (hyphens in name → underscores). */
+  const awtBase = `awt_${safeName.replace(/-/g, "_")}`;
   const platformEscapedInExpr = escapeForDoubleQuotes(platformUrl);
 
   const n8nWorkflow = {
@@ -46,32 +51,32 @@ export function buildAgentSnippetPayload(agent: DbAgent, platformUrl: string) {
       },
       {
         parameters: {
-          method: "POST",
-          url: `={{ $json.platformUrl || '${platformEscapedInExpr}' }}/bridge/check`,
+          method: "GET",
+          url: `={{ $json.platformUrl || '${platformEscapedInExpr}' }}/bridge/status`,
           sendHeaders: true,
           headerParameters: {
             parameters: [{ name: "Authorization", value: `Bearer ${agentToken}` }],
           },
           options: {},
         },
-        name: "Check Condition",
+        name: "Get Status",
         type: "n8n-nodes-base.httpRequest",
         typeVersion: 4.2,
         position: [470, 300],
-        id: "check-1",
+        id: "status-1",
       },
       {
         parameters: {
           conditions: {
             boolean: [
               {
-                value1: "={{ $json.conditionMet }}",
-                value2: true,
+                value1: "={{ $json.status }}",
+                value2: "active",
               },
             ],
           },
         },
-        name: "Condition Met?",
+        name: "Agent active?",
         type: "n8n-nodes-base.if",
         typeVersion: 2,
         position: [690, 300],
@@ -102,12 +107,12 @@ export function buildAgentSnippetPayload(agent: DbAgent, platformUrl: string) {
     ],
     connections: {
       "Every 30 seconds": {
-        main: [[{ node: "Check Condition", type: "main", index: 0 }]],
+        main: [[{ node: "Get Status", type: "main", index: 0 }]],
       },
-      "Check Condition": {
-        main: [[{ node: "Condition Met?", type: "main", index: 0 }]],
+      "Get Status": {
+        main: [[{ node: "Agent active?", type: "main", index: 0 }]],
       },
-      "Condition Met?": {
+      "Agent active?": {
         main: [[{ node: "Send IOTA (transact)", type: "main", index: 0 }], []],
       },
     },
@@ -121,15 +126,48 @@ export function buildAgentSnippetPayload(agent: DbAgent, platformUrl: string) {
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-// === AUTHWARD CONFIG ===
-const char* WIFI_SSID = "YOUR_WIFI";
-const char* WIFI_PASS = "YOUR_PASSWORD";
+// PLATFORM_URL: Authward backend base URL (same value the API used when generating this file — see env BACKEND_URL on the server).
 const char* PLATFORM_URL = "${platformUrl}";
 const char* AGENT_TOKEN = "${agentToken}";
-// Recipient IOTA address (required). amount is in IOTA (e.g. 5 or 0.5), NOT nanos.
+const char* WIFI_SSID = "YOUR_WIFI";
+const char* WIFI_PASS = "YOUR_PASSWORD";
 const char* RECIPIENT = "REPLACE_WITH_RECIPIENT_IOTA_ADDRESS";
 const float AMOUNT_IOTA = 5.0f;
-const int CHECK_INTERVAL = 30000; // 30 seconds
+const int POLL_INTERVAL_MS = 30000;
+
+String httpGet(const char* path) {
+  HTTPClient http;
+  http.begin(String(PLATFORM_URL) + path);
+  http.addHeader("Authorization", String("Bearer ") + AGENT_TOKEN);
+  int code = http.GET();
+  String response = http.getString();
+  http.end();
+  Serial.printf("[GET %s] %d: %s\\n", path, code, response.c_str());
+  return response;
+}
+
+String httpPostJson(const char* path, const String& jsonBody) {
+  HTTPClient http;
+  http.begin(String(PLATFORM_URL) + path);
+  http.addHeader("Authorization", String("Bearer ") + AGENT_TOKEN);
+  http.addHeader("Content-Type", "application/json");
+  int code = http.POST(jsonBody);
+  String response = http.getString();
+  http.end();
+  Serial.printf("[POST %s] %d: %s\\n", path, code, response.c_str());
+  return response;
+}
+
+void sendTransact() {
+  StaticJsonDocument<512> doc;
+  doc["to"] = RECIPIENT;
+  doc["amount"] = AMOUNT_IOTA;
+  doc["unit"] = "iota";
+  doc["memo"] = "Payment for invoice #123";
+  String body;
+  serializeJson(doc, body);
+  httpPostJson("/bridge/transact", body);
+}
 
 void setup() {
   Serial.begin(115200);
@@ -138,55 +176,16 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\\nConnected!");
-
-  callBridge("/bridge/activate", "");
-}
-
-void sendTransact() {
-  StaticJsonDocument<512> doc;
-  doc["to"] = RECIPIENT;
-  doc["amount"] = AMOUNT_IOTA;
-  doc["memo"] = "Payment for invoice #123";
-  String body;
-  serializeJson(doc, body);
-  callBridge("/bridge/transact", body);
+  Serial.println("\\nWiFi OK");
 }
 
 void loop() {
-  String checkResponse = callBridge("/bridge/check", "");
-
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, checkResponse);
-
-  if (doc["conditionMet"] == true) {
-    Serial.println("Condition met! Sending IOTA via /bridge/transact...");
+  String st = httpGet("/bridge/status");
+  DynamicJsonDocument doc(2048);
+  if (deserializeJson(doc, st) == DeserializationError::Ok && doc["status"] == "active") {
     sendTransact();
-  } else {
-    Serial.println("Condition not met, waiting...");
   }
-
-  delay(CHECK_INTERVAL);
-}
-
-String callBridge(String endpoint, String body) {
-  HTTPClient http;
-  http.begin(String(PLATFORM_URL) + endpoint);
-  http.addHeader("Authorization", String("Bearer ") + AGENT_TOKEN);
-  http.addHeader("Content-Type", "application/json");
-
-  int code;
-  if (body.length() > 0) {
-    code = http.POST(body);
-  } else {
-    code = http.POST("");
-  }
-
-  String response = http.getString();
-  http.end();
-
-  Serial.printf("[%s] %d: %s\\n", endpoint.c_str(), code, response.c_str());
-  return response;
+  delay(POLL_INTERVAL_MS);
 }`;
 
   const pyName = JSON.stringify(agentName);
@@ -197,8 +196,8 @@ String callBridge(String endpoint, String body) {
   const pythonContent = `#!/usr/bin/env python3
 """Authward Agent client (generated).
 
-Primary IOTA transfers: POST /bridge/transact with to, amount (IOTA units, e.g. 5 or 0.5 — not nanos), optional memo.
-Optional: /bridge/check + /bridge/execute for dashboard-preconfigured flows (e.g. shipment release_payment).
+Uses only GET /bridge/status and POST /bridge/transact.
+PLATFORM_URL is the backend base URL from the server (BACKEND_URL) when this file was generated.
 """
 from __future__ import annotations
 
@@ -212,53 +211,31 @@ AGENT_NAME = ${pyName}
 AGENT_DID = ${pyDid}
 PLATFORM_URL = ${pyPlatform}
 AGENT_TOKEN = ${pyToken}
-CHECK_INTERVAL = 30  # seconds
 
-# Generic transfer: valid IOTA address; amount in IOTA (not nanos)
 RECIPIENT = "REPLACE_WITH_RECIPIENT_IOTA_ADDRESS"
-AMOUNT_IOTA = 5  # e.g. 5 or 0.5
+AMOUNT_IOTA = 5
+POLL_INTERVAL = 30  # seconds
 
-HEADERS = {
-    "Authorization": f"Bearer {AGENT_TOKEN}",
-    "Content-Type": "application/json",
-}
+AUTH_HEADER = {"Authorization": f"Bearer {AGENT_TOKEN}"}
+JSON_HEADERS = {**AUTH_HEADER, "Content-Type": "application/json"}
 
 
-def activate():
-    """Activate the agent (once)."""
-    r = requests.post(f"{PLATFORM_URL}/bridge/activate", headers=HEADERS)
-    print(f"[activate] {r.status_code}: {r.json()}")
-    return r.json()
+def status():
+    """GET /bridge/status — agent state, balance, permissions."""
+    r = requests.get(f"{PLATFORM_URL}/bridge/status", headers=AUTH_HEADER, timeout=60)
+    data = r.json()
+    print(f"[status] {r.status_code}: {data}")
+    return data
 
 
 def transact(to: str, amount: float, memo: Optional[str] = None):
-    """Send IOTA from the agent wallet via POST /bridge/transact (amount in IOTA, not nanos)."""
-    body: dict = {"to": to, "amount": amount}
+    """POST /bridge/transact — use unit iota for amounts in whole/fractional IOTA (default amount is nanos)."""
+    body: dict = {"to": to, "amount": amount, "unit": "iota"}
     if memo is not None:
         body["memo"] = memo
-    r = requests.post(f"{PLATFORM_URL}/bridge/transact", headers=HEADERS, json=body)
+    r = requests.post(f"{PLATFORM_URL}/bridge/transact", headers=JSON_HEADERS, json=body, timeout=120)
     data = r.json()
     print(f"[transact] {r.status_code}: {data}")
-    return data
-
-
-def check():
-    """Poll condition (e.g. shipment delivered) for monitor flows."""
-    r = requests.post(f"{PLATFORM_URL}/bridge/check", headers=HEADERS)
-    data = r.json()
-    print(f"[check] conditionMet: {data.get('conditionMet')}")
-    return data
-
-
-def execute(action="release_payment"):
-    """Preconfigured action only (e.g. shipment payment from task config). Not for arbitrary transfers — use transact()."""
-    r = requests.post(
-        f"{PLATFORM_URL}/bridge/execute",
-        headers=HEADERS,
-        json={"action": action},
-    )
-    data = r.json()
-    print(f"[execute] {data}")
     return data
 
 
@@ -268,138 +245,99 @@ if __name__ == "__main__":
     print(f"Platform: {PLATFORM_URL}")
     print("---")
 
-    activate()
-
-    # Primary: generic IOTA transfer
-    transact(RECIPIENT, AMOUNT_IOTA, "Payment for invoice #123")
-
-    # Or — monitor + preconfigured execute (TraceFlow / shipment), not arbitrary sends:
-    # while True:
-    #     try:
-    #         result = check()
-    #         if result.get("conditionMet"):
-    #             execute("release_payment")
-    #     except Exception as e:
-    #         print(f"[error] {e}")
-    #     time.sleep(CHECK_INTERVAL)`;
+    while True:
+        s = status()
+        if s.get("status") == "active":
+            result = transact(RECIPIENT, AMOUNT_IOTA, "Payment for invoice #123")
+            if result.get("success") is True:
+                print("Transaction succeeded, done.")
+                break
+        time.sleep(POLL_INTERVAL)`;
 
   const zapierContent = `Authward Agent — ${agentName}
 DID: ${agentDid}
 
-Zapier has no import file. Create a Zap, add Webhooks by Zapier → POST actions,
-and use the config below.
-
-=== AUTHWARD CONFIG ===
 PLATFORM_URL = ${platformUrl}
+  (backend base URL from the server BACKEND_URL when this file was generated)
+
 AGENT_TOKEN = ${agentToken}
 
-For every POST request, add:
-  Authorization: Bearer <paste AGENT_TOKEN>
-  Content-Type: application/json   (when sending a JSON body)
+Only these Bridge endpoints are used:
 
-=== PRIMARY: SEND IOTA ===
-POST ${platformUrl}/bridge/transact
+=== GET /bridge/status ===
+URL: ${platformUrl}/bridge/status
+Headers:
+  Authorization: Bearer <AGENT_TOKEN>
+
+Response includes agent status, wallet balance, task config, permissions.
+
+=== POST /bridge/transact ===
+URL: ${platformUrl}/bridge/transact
+Headers:
+  Authorization: Bearer <AGENT_TOKEN>
+  Content-Type: application/json
+
 Body (JSON):
-  "to": required — valid IOTA address
-  "amount": required — number > 0, in IOTA units (e.g. 5 or 0.5), NOT nanos
-  "memo": optional — string, max 256 chars (server logging only)
+  "to" — required, valid IOTA address
+  "amount" — required, positive number (nanos by default; use "unit":"iota" for IOTA amounts)
+  "unit" — optional: "nanos" (default) or "iota"
+  "memo" — optional, max 256 characters (server logging only)
 
 Example:
-  {"to":"0x…","amount":5,"memo":"Payment for invoice #123"}
+  {"to":"0x…","amount":5,"unit":"iota","memo":"Payment for invoice #123"}
 
-Success: JSON with success, txHash, from, to, amount, remainingDailyBudget, walletBalance, etc.
-Errors: 401 invalid token; 403 agent inactive/revoked or permit limits; 400 bad body, invalid address, memo too long, insufficient_balance (+ walletBalance); 500 server/network.
-
-=== OTHER ENDPOINTS (POST) ===
-1) ${platformUrl}/bridge/activate — run once before transact (dashboard activation required first).
-2) ${platformUrl}/bridge/check — conditionMet for monitor flows (e.g. shipment).
-
-3) ${platformUrl}/bridge/execute — preconfigured tasks only (e.g. action release_payment with task config).
-   For arbitrary IOTA sends, use /bridge/transact only.
-
-Typical Zap: Trigger → POST activate (if needed) → POST transact with JSON body above.`;
+Typical Zap: Trigger → GET status → (optional filter if status is active) → POST transact.`;
 
   const curlContent = `#!/bin/bash
 # Authward Agent — ${agentName}
 # DID: ${agentDid}
-# amount below is in IOTA (e.g. 5 or 0.5), NOT nanos.
+# PLATFORM_URL matches the server BACKEND_URL used when this snippet was generated.
 
 PLATFORM_URL="${platformUrl}"
 AGENT_TOKEN="${agentToken}"
 RECIPIENT="REPLACE_WITH_RECIPIENT_IOTA_ADDRESS"
 
-# 1. Activate the agent (once)
-curl -s -X POST "$PLATFORM_URL/bridge/activate" \\
+# GET /bridge/status
+curl -s -X GET "$PLATFORM_URL/bridge/status" \\
   -H "Authorization: Bearer $AGENT_TOKEN" | jq .
 
-# 2. (Optional) Check monitor condition — shipment / TraceFlow flows
-curl -s -X POST "$PLATFORM_URL/bridge/check" \\
-  -H "Authorization: Bearer $AGENT_TOKEN" | jq .
-
-# 3. Primary: send IOTA (generic transfer)
+# POST /bridge/transact (amount with unit iota = human IOTA, not raw nanos)
 curl -s -X POST "$PLATFORM_URL/bridge/transact" \\
   -H "Authorization: Bearer $AGENT_TOKEN" \\
   -H "Content-Type: application/json" \\
-  -d "{\\"to\\":\\"$RECIPIENT\\",\\"amount\\":5,\\"memo\\":\\"Payment for invoice #123\\"}" | jq .
-
-# Preconfigured execute only (e.g. shipment release_payment) — not for arbitrary transfers:
-# curl -s -X POST "$PLATFORM_URL/bridge/execute" \\
-#   -H "Authorization: Bearer $AGENT_TOKEN" \\
-#   -H "Content-Type: application/json" \\
-#   -d '{"action": "release_payment"}' | jq .`;
+  -d "{\\"to\\":\\"$RECIPIENT\\",\\"amount\\":5,\\"unit\\":\\"iota\\",\\"memo\\":\\"Payment for invoice #123\\"}" | jq .`;
 
   const jsContent = `#!/usr/bin/env node
 /**
  * Authward Agent — ${agentName}
  * DID: ${agentDid}
- * amount for transact() is in IOTA (e.g. 5 or 0.5), NOT nanos.
+ * PLATFORM_URL: backend base URL from server (BACKEND_URL) when this file was generated.
  */
 
 const PLATFORM_URL = '${escapeForJsString(platformUrl)}';
 const AGENT_TOKEN = '${escapeForJsString(agentToken)}';
 const RECIPIENT = '${escapeForJsString("REPLACE_WITH_RECIPIENT_IOTA_ADDRESS")}';
-const CHECK_INTERVAL = 30000; // 30 seconds
 
-const headers = {
-  'Authorization': \`Bearer \${AGENT_TOKEN}\`,
-  'Content-Type': 'application/json'
-};
+const authHeaders = { Authorization: \`Bearer \${AGENT_TOKEN}\` };
+const jsonHeaders = { ...authHeaders, 'Content-Type': 'application/json' };
 
-async function activate() {
-  const r = await fetch(\`\${PLATFORM_URL}/bridge/activate\`, { method: 'POST', headers });
+async function status() {
+  const r = await fetch(\`\${PLATFORM_URL}/bridge/status\`, { headers: authHeaders });
   const data = await r.json();
-  console.log('[activate]', data);
+  console.log('[status]', data);
   return data;
 }
 
 async function transact(to, amount, memo) {
-  const body = { to, amount };
+  const body = { to, amount, unit: 'iota' };
   if (memo !== undefined && memo !== null) body.memo = memo;
   const r = await fetch(\`\${PLATFORM_URL}/bridge/transact\`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify(body)
+    headers: jsonHeaders,
+    body: JSON.stringify(body),
   });
   const data = await r.json();
   console.log('[transact]', data);
-  return data;
-}
-
-async function check() {
-  const r = await fetch(\`\${PLATFORM_URL}/bridge/check\`, { method: 'POST', headers });
-  const data = await r.json();
-  console.log('[check] conditionMet:', data.conditionMet);
-  return data;
-}
-
-/** Preconfigured shipment/release only — not for arbitrary IOTA sends. */
-async function execute(action = 'release_payment') {
-  const r = await fetch(\`\${PLATFORM_URL}/bridge/execute\`, {
-    method: 'POST', headers,
-    body: JSON.stringify({ action })
-  });
-  const data = await r.json();
-  console.log('[execute]', data);
   return data;
 }
 
@@ -407,19 +345,10 @@ async function main() {
   console.log('Authward Agent: ${escapeForJsString(agentName)}');
   console.log('DID: ${escapeForJsString(agentDid)}');
 
-  await activate();
-
-  await transact(RECIPIENT, 5, 'Payment for invoice #123');
-
-  // Or — monitor loop + preconfigured execute (not arbitrary transfers):
-  // setInterval(async () => {
-  //   try {
-  //     const result = await check();
-  //     if (result.conditionMet) await execute();
-  //   } catch (e) {
-  //     console.error('[error]', e.message);
-  //   }
-  // }, CHECK_INTERVAL);
+  const s = await status();
+  if (s.status === 'active') {
+    await transact(RECIPIENT, 5, 'Payment for invoice #123');
+  }
 }
 
 main();`;
@@ -433,44 +362,44 @@ main();`;
       n8n: {
         label: "n8n Workflow",
         description:
-          "In n8n, open the … menu at the top right of the workflow, then choose Import from File. Replace the recipient in “Send IOTA (transact)”; amount is in IOTA (e.g. 5 or 0.5), not nanos.",
+          "In n8n, open the … menu at the top right of the workflow, then choose Import from File. Flow: GET status → if active → transact (edit JSON body).",
         fileType: "json",
-        fileName: `authward-agent-${safeName}.json`,
+        fileName: `${awtBase}.json`,
         content: n8nWorkflow,
       },
       arduino: {
         label: "Arduino / ESP32",
-        description: "WiFi sketch — transact for IOTA (amount in IOTA units, not nanos)",
+        description: "GET /bridge/status then POST /bridge/transact when active",
         fileType: "ino",
-        fileName: "authward_agent.ino",
+        fileName: `${awtBase}.ino`,
         content: arduinoContent,
       },
       python: {
         label: "Python Script",
-        description: "Bots / servers — POST /bridge/transact for transfers (IOTA amount, not nanos)",
+        description: "Poll GET /bridge/status, POST /bridge/transact when active",
         fileType: "py",
-        fileName: "authward_agent.py",
+        fileName: `${awtBase}.py`,
         content: pythonContent,
       },
       zapier: {
         label: "Zapier",
-        description: "Webhooks (POST) — primary path /bridge/transact; reference file for Zap editor",
+        description: "GET status + POST transact only — reference for Webhooks by Zapier",
         fileType: "txt",
-        fileName: `authward-agent-${safeName}-zapier.txt`,
+        fileName: `${awtBase}_zapier.txt`,
         content: zapierContent,
       },
       curl: {
         label: "cURL (generic)",
-        description: "Shell — transact JSON example (IOTA amount, not nanos); execute commented for preconfigured flows",
+        description: "GET /bridge/status and POST /bridge/transact examples",
         fileType: "sh",
-        fileName: "authward_agent.sh",
+        fileName: `${awtBase}.sh`,
         content: curlContent,
       },
       javascript: {
         label: "JavaScript / Node.js",
-        description: "Node — transact() for IOTA sends (amount in IOTA, not nanos)",
+        description: "fetch GET /bridge/status, then POST /bridge/transact if active",
         fileType: "js",
-        fileName: "authward_agent.js",
+        fileName: `${awtBase}.js`,
         content: jsContent,
       },
     },

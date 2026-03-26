@@ -1,13 +1,12 @@
 import fs from "fs-extra";
 
-import type { AuthProviderType, DbAgent, DbAgentLog, DbShape, DbShipment, DbUser } from "../types/db.js";
+import type { AuthProviderType, DbAgent, DbAgentLog, DbShape, DbUser } from "../types/db.js";
 import { DB_INIT_PATH, DB_PATH } from "../paths.js";
 
 const emptyDb = (): DbShape => ({
   users: [],
   agents: [],
   agentLogs: [],
-  shipments: [],
 });
 
 function isAuthProviderType(v: unknown): v is AuthProviderType {
@@ -87,6 +86,9 @@ export function normalizeDb(parsed: unknown): { shape: DbShape; migrated: boolea
   const usersRaw = Array.isArray(o.users) ? o.users : [];
   const agentsRaw = Array.isArray(o.agents) ? o.agents : [];
   let migrated = false;
+  if ("shipments" in o && o.shipments !== undefined) {
+    migrated = true;
+  }
   const users: DbUser[] = [];
   for (const u of usersRaw) {
     const r = migrateUserRecord(u);
@@ -104,7 +106,6 @@ export function normalizeDb(parsed: unknown): { shape: DbShape; migrated: boolea
       users,
       agents,
       agentLogs: Array.isArray(o.agentLogs) ? (o.agentLogs as DbAgentLog[]) : [],
-      shipments: Array.isArray(o.shipments) ? (o.shipments as DbShipment[]) : [],
     },
     migrated,
   };
@@ -113,12 +114,7 @@ export function normalizeDb(parsed: unknown): { shape: DbShape; migrated: boolea
 function needsDbRepair(parsed: unknown): boolean {
   if (!parsed || typeof parsed !== "object") return true;
   const o = parsed as Record<string, unknown>;
-  return (
-    !Array.isArray(o.users) ||
-    !Array.isArray(o.agents) ||
-    !Array.isArray(o.agentLogs) ||
-    !Array.isArray(o.shipments)
-  );
+  return !Array.isArray(o.users) || !Array.isArray(o.agents) || !Array.isArray(o.agentLogs);
 }
 
 async function readDbInitFromDisk(): Promise<DbShape | null> {
@@ -134,45 +130,13 @@ async function readDbInitFromDisk(): Promise<DbShape | null> {
   }
 }
 
-/** Appends shipments from `init` that are not already present (key `id`). Does not touch users/agents/agentLogs. */
-export function mergeShipmentsFromInit(current: DbShape, init: DbShape): { merged: DbShape; addedCount: number } {
-  const seen = new Set(current.shipments.map((s) => s.id));
-  const mergedShipments = [...current.shipments];
-  let addedCount = 0;
-  for (const s of init.shipments) {
-    if (seen.has(s.id)) continue;
-    mergedShipments.push(s);
-    seen.add(s.id);
-    addedCount++;
-  }
-  return {
-    merged: { ...current, shipments: mergedShipments },
-    addedCount,
-  };
-}
-
-/**
- * Reads `db_init.json` and merges into the on-disk DB only new shipments (by `id`).
- * Useful after a deploy with new demo records without losing local users/agents.
- */
+/** Legacy no-op: kept for admin `POST /merge-db-init` compatibility. */
 export async function mergeDbInitIntoExisting(): Promise<{ addedShipments: number; changed: boolean }> {
-  const init = await readDbInitFromDisk();
-  if (!init) {
-    return { addedShipments: 0, changed: false };
-  }
-  const current = await readDb();
-  const { merged, addedCount } = mergeShipmentsFromInit(current, init);
-  if (addedCount === 0) {
-    return { addedShipments: 0, changed: false };
-  }
-  await writeDb(merged);
-  return { addedShipments: addedCount, changed: true };
+  return { addedShipments: 0, changed: false };
 }
 
 /**
- * Sovrascrive `db.json` con il contenuto normalizzato di `db_init.json`.
- * Se `db_init.json` manca o non è leggibile, scrive un DB vuoto.
- * Perdita totale di utenti/agenti/log locali — solo per test o reset controllato.
+ * Overwrites `db.json` from normalized `db_init.json`, or empty DB if init is missing.
  */
 export async function resetDbFromInit(): Promise<{ source: "init" | "empty" }> {
   const init = await readDbInitFromDisk();
@@ -191,12 +155,10 @@ export async function ensureDbFile(): Promise<void> {
     if (init) {
       await fs.writeFile(DB_PATH, JSON.stringify(init, null, 2), "utf8");
       console.log(
-        `[db] No db.json — created from db_init.json (${init.shipments.length} shipment(s), ${init.users.length} user(s)).`,
+        `[db] No db.json — created from db_init.json (${init.users.length} user(s) in template).`,
       );
     } else {
-      console.warn(
-        "[db] No db.json and db_init.json missing or unreadable — created empty db.json (no demo shipments).",
-      );
+      console.warn("[db] No db.json and db_init.json missing or unreadable — created empty db.json.");
       await fs.writeJson(DB_PATH, emptyDb(), { spaces: 2 });
     }
     return;
@@ -229,8 +191,7 @@ export async function writeDb(data: DbShape): Promise<void> {
 }
 
 /**
- * Sostituisce interamente `db.json` dopo normalizzazione/migrazione record.
- * Può lanciare se un user/agent non è migrabile (es. manca providerId).
+ * Replaces entire `db.json` after record normalization/migration.
  */
 export async function replaceDbFromPayload(parsed: unknown): Promise<DbShape> {
   const { shape } = normalizeDb(parsed);
@@ -324,20 +285,6 @@ export async function updateAgentByDid(agentDid: string, patch: Partial<DbAgent>
   const i = db.agents.findIndex((a) => a.agentDid === agentDid);
   if (i < 0) return false;
   db.agents[i] = { ...db.agents[i], ...patch };
-  await writeDb(db);
-  return true;
-}
-
-export async function findShipmentById(id: string): Promise<DbShipment | undefined> {
-  const db = await readDb();
-  return db.shipments.find((s) => s.id === id);
-}
-
-export async function updateShipmentById(id: string, patch: Partial<DbShipment>): Promise<boolean> {
-  const db = await readDb();
-  const i = db.shipments.findIndex((s) => s.id === id);
-  if (i < 0) return false;
-  db.shipments[i] = { ...db.shipments[i], ...patch };
   await writeDb(db);
   return true;
 }

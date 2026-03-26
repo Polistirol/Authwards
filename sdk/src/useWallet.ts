@@ -5,7 +5,11 @@ import { AuthwardsContext } from "./AuthwardsContext";
 export type WalletBalanceResponse = {
   address: string;
   coinType?: string;
+  /** Chain balance in nanos (string). */
+  balanceNanos?: string;
   balance: string;
+  /** Display helper (IOTA). */
+  balanceIota?: number;
   nanos?: string;
 };
 
@@ -48,7 +52,7 @@ export function useWallet(): UseWalletResult {
           throw new Error(t || `HTTP ${res.status}`);
         }
         const data = (await res.json()) as WalletBalanceResponse;
-        setBalance(data.balance);
+        setBalance(data.balanceNanos ?? data.balance);
         return data;
       } finally {
         setLoading(false);

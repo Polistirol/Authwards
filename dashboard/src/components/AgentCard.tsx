@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Agent, AgentLog, AgentStatus } from "../sdk";
 
+import { IconArrowTopRightOnSquare, IconCheck, IconClipboard } from "./icons";
+
 type AgentCardProps = {
   agent: Agent;
   backendUrl: string;
@@ -13,9 +15,34 @@ type AgentCardProps = {
   fetchAgentLogs: (agentDid: string) => Promise<void>;
 };
 
-function truncateDid(did: string, len = 20): string {
-  if (did.length <= len) return did;
-  return `${did.slice(0, len)}...`;
+function truncateWalletAddress(addr: string): string {
+  const a = addr.trim();
+  if (a.length <= 14) return a;
+  if (a.startsWith("0x") && a.length > 10) {
+    return `${a.slice(0, 6)}...${a.slice(-4)}`;
+  }
+  return `${a.slice(0, 6)}...${a.slice(-4)}`;
+}
+
+function explorerObjectUrl(objectId: string, agentDid: string): string {
+  const base = `https://explorer.iota.org/object/${encodeURIComponent(objectId)}`;
+  const m = agentDid.match(/did:iota:([^:]+):/);
+  const net = m?.[1];
+  if (net && net !== "mainnet") {
+    return `${base}?network=${encodeURIComponent(net)}`;
+  }
+  return base;
+}
+
+/** Short label: `iota:did:0xaaaa...bbbb` from `did:iota:<net>:0x...`. */
+function formatAgentDidDisplay(did: string): string {
+  const trimmed = did.trim();
+  const parts = trimmed.split(":");
+  const last = parts[parts.length - 1] ?? "";
+  if (last.startsWith("0x") && last.length > 2) {
+    return `iota:did:${truncateWalletAddress(last)}`;
+  }
+  return trimmed;
 }
 
 function effectiveStatus(agent: Agent): AgentStatus {
@@ -124,7 +151,8 @@ export default function AgentCard({
   onActivate,
   fetchAgentLogs,
 }: AgentCardProps) {
-  const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<"did" | "wallet" | null>(null);
+  const [cardExpanded, setCardExpanded] = useState(true);
   const [balanceNanos, setBalanceNanos] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -160,8 +188,9 @@ export default function AgentCard({
       try {
         const res = await fetch(balanceUrl);
         if (!res.ok || cancelled) return;
-        const json = (await res.json()) as { balance?: string };
-        if (!cancelled && json.balance !== undefined) setBalanceNanos(json.balance);
+        const json = (await res.json()) as { balanceNanos?: string; balance?: string };
+        const nanos = json.balanceNanos ?? json.balance;
+        if (!cancelled && nanos !== undefined) setBalanceNanos(nanos);
       } catch {
         if (!cancelled) setBalanceNanos(null);
       }
@@ -175,11 +204,14 @@ export default function AgentCard({
     };
   }, [agent.walletAddress, trimBackend]);
 
-  async function copyDid(): Promise<void> {
+  async function copyToClipboard(
+    text: string,
+    field: "did" | "wallet",
+  ): Promise<void> {
     try {
-      await navigator.clipboard.writeText(agent.agentDid);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
     } catch {
       /* ignore */
     }
@@ -199,7 +231,7 @@ export default function AgentCard({
   async function handleRevoke(): Promise<void> {
     if (
       !window.confirm(
-        "Are you sure you want to revoke this agent? This cannot be undone.",
+        "Are you sure you want to revoke this delegate? This cannot be undone.",
       )
     ) {
       return;
@@ -239,34 +271,67 @@ export default function AgentCard({
     [logs],
   );
 
-  const displayName = agent.name?.trim() || "Unnamed agent";
+  const displayName = agent.name?.trim() || "Unnamed delegate";
+
+  const walletAddr = agent.walletAddress?.trim() ?? "";
+  const permitId = agent.permitObjectId?.trim() ?? "";
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <div className="mb-4 border-b border-white/10 pb-4">
-        <h3 className="text-lg font-semibold text-white">{displayName}</h3>
-        {agent.description?.trim() ? (
-          <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            {agent.description.trim()}
-          </p>
-        ) : null}
+    <article
+      className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+      aria-label="Delegate card"
+    >
+      <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="truncate text-lg font-semibold text-white">
+              {displayName}
+            </h3>
+            {!cardExpanded ? <StatusLed status={status} /> : null}
+          </div>
+          {cardExpanded && agent.description?.trim() ? (
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
+              {agent.description.trim()}
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          aria-expanded={cardExpanded}
+          aria-label={cardExpanded ? "Collapse delegate card" : "Expand delegate card"}
+          onClick={() => setCardExpanded((v) => !v)}
+          className="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+        >
+          <ChevronDownIcon className={`h-5 w-5 transition-transform ${cardExpanded ? "rotate-180" : ""}`} />
+        </button>
       </div>
 
+      {cardExpanded ? (
+        <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
             DID
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <code className="truncate text-sm text-[#e2e4ed]">
-              {truncateDid(agent.agentDid)}
+          <div className="mt-1 flex flex-wrap items-start gap-2">
+            <code
+              className="break-all font-mono text-sm leading-snug text-[#6ee7b7]"
+              title={agent.agentDid}
+            >
+              {formatAgentDidDisplay(agent.agentDid)}
             </code>
             <button
               type="button"
-              onClick={() => void copyDid()}
-              className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-2 py-0.5 text-xs text-[#6ee7b7] hover:bg-white/10"
+              onClick={() => void copyToClipboard(agent.agentDid, "did")}
+              aria-label="Copy DID"
+              title={copiedField === "did" ? "Copied" : "Copy DID"}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
             >
-              {copied ? "Copied" : "Copy DID"}
+              {copiedField === "did" ? (
+                <IconCheck className="h-3.5 w-3.5 text-[#6ee7b7]" />
+              ) : (
+                <IconClipboard className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
         </div>
@@ -283,9 +348,29 @@ export default function AgentCard({
       <div className="mt-6 grid gap-4 rounded-xl border border-[#2a2d3a] bg-[#12131a]/80 p-4 sm:grid-cols-2">
         <div>
           <p className="text-xs font-medium uppercase text-slate-500">Wallet</p>
-          <p className="mt-1 break-all font-mono text-xs text-[#6ee7b7]">
-            {agent.walletAddress || "—"}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p
+              className="min-w-0 font-mono text-sm text-[#6ee7b7]"
+              title={walletAddr || undefined}
+            >
+              {walletAddr ? truncateWalletAddress(walletAddr) : "—"}
+            </p>
+            {walletAddr ? (
+              <button
+                type="button"
+                onClick={() => void copyToClipboard(walletAddr, "wallet")}
+                aria-label="Copy wallet address"
+                title={copiedField === "wallet" ? "Copied" : "Copy wallet address"}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
+              >
+                {copiedField === "wallet" ? (
+                  <IconCheck className="h-3.5 w-3.5 text-[#6ee7b7]" />
+                ) : (
+                  <IconClipboard className="h-3.5 w-3.5" />
+                )}
+              </button>
+            ) : null}
+          </div>
           <p className="mt-1 text-sm text-slate-300">
             Balance:{" "}
             <span className="font-mono text-[#6ee7b7]">
@@ -309,6 +394,29 @@ export default function AgentCard({
           <p className="mt-1 text-sm text-slate-200">
             {formatDate(agent.createdAt)}
           </p>
+          <p className="mt-3 text-xs font-medium uppercase text-slate-500">
+            Delegate permit ID
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <code
+              className="min-w-0 break-all font-mono text-sm text-[#6ee7b7]"
+              title={permitId || undefined}
+            >
+              {permitId ? truncateWalletAddress(permitId) : "—"}
+            </code>
+            {permitId ? (
+              <a
+                href={explorerObjectUrl(permitId, agent.agentDid)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View permit on IOTA Explorer"
+                title="Open in IOTA Explorer"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+              >
+                <IconArrowTopRightOnSquare className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+          </div>
         </div>
         <div>
           <p className="text-xs font-medium uppercase text-slate-500">Activated</p>
@@ -328,7 +436,7 @@ export default function AgentCard({
               onClick={() => openActivateModal()}
               className="rounded-lg bg-[#6ee7b7] px-5 py-2.5 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8]"
             >
-              Activate Agent
+              Activate delegate
             </button>
           ) : null}
           {status === "active" ? (
@@ -354,7 +462,7 @@ export default function AgentCard({
             disabled={!agent.walletAddress}
             className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Fund Agent
+            Fund delegate
           </button>
           {status === "active" ? (
             <button
@@ -368,6 +476,40 @@ export default function AgentCard({
         </div>
       )}
 
+      <div className="mt-6 border-t border-white/10 pt-4">
+        <button
+          type="button"
+          onClick={() => void expandHistory()}
+          className="text-sm font-medium text-[#6ee7b7] hover:underline"
+        >
+          {historyOpen ? "Hide transaction history" : "View transaction history"}
+        </button>
+        {historyOpen ? (
+          <div className="mt-3 max-h-52 space-y-2 overflow-y-auto rounded-lg border border-white/5 bg-black/20 p-2">
+            {historyLoading ? (
+              <p className="text-xs text-slate-500">Loading…</p>
+            ) : sortedLogs.length === 0 ? (
+              <p className="text-xs text-slate-500">No logs.</p>
+            ) : (
+              sortedLogs.map((log, idx) => (
+                <div
+                  key={`${log.timestamp}-${idx}`}
+                  className="rounded border border-white/5 px-2 py-1.5 font-mono text-xs"
+                >
+                  <span className="text-slate-500">
+                    {formatDate(log.timestamp)}{" "}
+                  </span>
+                  <span className={logTypeClass(log.type)}>{log.type}</span>
+                  <p className="mt-0.5 text-slate-300">{formatLogLine(log)}</p>
+                </div>
+              ))
+            )}
+          </div>
+        ) : null}
+      </div>
+        </>
+      ) : null}
+
       {activateOpen ? (
         <div
           className="fixed inset-0 z-[190] flex items-center justify-center bg-black/65 p-4"
@@ -377,12 +519,12 @@ export default function AgentCard({
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="activate-agent-title"
+            aria-labelledby="activate-delegate-title"
             className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#12141c] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2
-              id="activate-agent-title"
+              id="activate-delegate-title"
               className="text-lg font-semibold text-white"
             >
               Activate {displayName}
@@ -416,38 +558,6 @@ export default function AgentCard({
           </div>
         </div>
       ) : null}
-
-      <div className="mt-6 border-t border-white/10 pt-4">
-        <button
-          type="button"
-          onClick={() => void expandHistory()}
-          className="text-sm font-medium text-[#6ee7b7] hover:underline"
-        >
-          {historyOpen ? "Hide transaction history" : "View transaction history"}
-        </button>
-        {historyOpen ? (
-          <div className="mt-3 max-h-52 space-y-2 overflow-y-auto rounded-lg border border-white/5 bg-black/20 p-2">
-            {historyLoading ? (
-              <p className="text-xs text-slate-500">Loading…</p>
-            ) : sortedLogs.length === 0 ? (
-              <p className="text-xs text-slate-500">No logs.</p>
-            ) : (
-              sortedLogs.map((log, idx) => (
-                <div
-                  key={`${log.timestamp}-${idx}`}
-                  className="rounded border border-white/5 px-2 py-1.5 font-mono text-xs"
-                >
-                  <span className="text-slate-500">
-                    {formatDate(log.timestamp)}{" "}
-                  </span>
-                  <span className={logTypeClass(log.type)}>{log.type}</span>
-                  <p className="mt-0.5 text-slate-300">{formatLogLine(log)}</p>
-                </div>
-              ))
-            )}
-          </div>
-        ) : null}
-      </div>
     </article>
   );
 }
@@ -503,7 +613,7 @@ function ActivateModalBody({
     return (
       <div className="mt-4 space-y-3 text-sm leading-relaxed text-slate-300">
         <p>
-          You are about to activate this agent. It can monitor on-chain data but cannot
+          You are about to activate this delegate. It can monitor on-chain data but cannot
           execute transactions.
         </p>
       </div>
@@ -514,7 +624,7 @@ function ActivateModalBody({
     return (
       <div className="mt-4 space-y-4 text-sm">
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-100">
-          You are about to enable this agent to spend autonomously from its wallet.
+          You are about to enable this delegate to spend autonomously from its wallet.
         </p>
         <ul className="list-inside list-disc space-y-1 text-slate-300">
           <li>Max per transaction: {caps.maxTxIota} IOTA</li>
@@ -534,7 +644,7 @@ function ActivateModalBody({
             checked={activateConfirm}
             onChange={(e) => setActivateConfirm(e.target.checked)}
           />
-          <span>I confirm I want to activate this agent</span>
+          <span>I confirm I want to activate this delegate</span>
         </label>
       </div>
     );
@@ -544,7 +654,7 @@ function ActivateModalBody({
     return (
       <div className="mt-4 space-y-4 text-sm">
         <p className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-2 font-medium text-red-200">
-          WARNING: you are about to enable this agent with NO spending limits.
+          WARNING: you are about to enable this delegate with NO spending limits.
         </p>
         <ul className="list-inside list-disc space-y-1 text-slate-300">
           <li>
@@ -566,7 +676,7 @@ function ActivateModalBody({
             checked={activateConfirm}
             onChange={(e) => setActivateConfirm(e.target.checked)}
           />
-          <span>I confirm I want to activate this agent with no spending limits</span>
+          <span>I confirm I want to activate this delegate with no spending limits</span>
         </label>
       </div>
     );
@@ -575,7 +685,7 @@ function ActivateModalBody({
   return (
     <div className="mt-4 space-y-4 text-sm">
       <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-100">
-        You are about to enable this agent with the custom limits below.
+        You are about to enable this delegate with the custom limits below.
       </p>
       <ul className="list-inside list-disc space-y-1 text-slate-300">
         <li>Max per transaction: {caps.maxTxIota} IOTA</li>
@@ -591,7 +701,7 @@ function ActivateModalBody({
           checked={activateConfirm}
           onChange={(e) => setActivateConfirm(e.target.checked)}
         />
-        <span>I confirm I want to activate this agent</span>
+        <span>I confirm I want to activate this delegate</span>
       </label>
     </div>
   );
@@ -622,7 +732,7 @@ function ActivateConfirmButton({
         onClick={onClick}
         className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {activating ? "Activating…" : "Activate Agent"}
+        {activating ? "Activating…" : "Activate delegate"}
       </button>
     );
   }
@@ -635,7 +745,7 @@ function ActivateConfirmButton({
         onClick={onClick}
         className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {activating ? "Activating…" : "Activate Agent"}
+        {activating ? "Activating…" : "Activate delegate"}
       </button>
     );
   }
@@ -647,7 +757,7 @@ function ActivateConfirmButton({
       onClick={onClick}
       className="rounded-lg bg-[#6ee7b7] px-5 py-2 text-sm font-semibold text-[#0a0b0f] hover:bg-[#5dd9a8] disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {activating ? "Activating…" : "Activate Agent"}
+      {activating ? "Activating…" : "Activate delegate"}
     </button>
   );
 }
@@ -673,3 +783,50 @@ function StatusBadge({ status }: { status: AgentStatus }) {
     </span>
   );
 }
+
+function StatusLed({ status }: { status: AgentStatus }) {
+  if (status === "created" || status === "pending_activation") {
+    return (
+      <span
+        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.75)]"
+        title="Not activated"
+        aria-hidden
+      />
+    );
+  }
+  if (status === "active") {
+    return (
+      <span
+        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]"
+        title="Active"
+        aria-hidden
+      />
+    );
+  }
+  return (
+    <span
+      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.65)]"
+      title="Revoked"
+      aria-hidden
+    />
+  );
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path
+        fillRule="evenodd"
+        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+

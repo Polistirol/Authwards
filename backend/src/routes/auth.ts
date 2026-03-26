@@ -13,6 +13,7 @@ import { isOriginAllowed } from "../allowedFrontendOrigins.js";
 import * as db from "../services/db.js";
 import { createDid } from "../services/did.js";
 import { encryptAgentPrivateKey } from "../services/agentCrypto.js";
+import { iotaToNanos } from "../constants.js";
 import { transferFromMaster } from "../services/masterWallet.js";
 import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
@@ -159,7 +160,7 @@ async function completeOAuthLogin(
       try {
         const amountIota = Number.parseFloat(process.env.WELCOME_AIRDROP_AMOUNT ?? "0");
         if (amountIota > 0) {
-          const nanos = BigInt(Math.round(amountIota * 1e9));
+          const nanos = iotaToNanos(amountIota); // WELCOME_AIRDROP_AMOUNT is in IOTA
           const digest = await transferFromMaster(walletAddress, nanos);
           airdropTxHash = digest;
           console.log(

@@ -1,10 +1,13 @@
 import { Router, type Response } from "express";
 import { IotaClient } from "@iota/iota-sdk/client";
+import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 import { Transaction } from "@iota/iota-sdk/transactions";
 import { normalizeIotaAddress } from "@iota/iota-sdk/utils";
 
+import { iotaToNanos, nanosToIota, NANOS_PER_IOTA_BI } from "../constants.js";
 import { requireAgentToken } from "../middleware/agentAuth.js";
 import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
+import { decryptUserWalletSecret } from "../services/agentCrypto.js";
 import * as db from "../services/db.js";
 import { getPermissionLimits, utcDateString } from "../services/agentPermissions.js";
 import { deriveAgentKeypair } from "../services/keyDerivation.js";
@@ -13,18 +16,13 @@ import {
   getPermitInfo,
   revokePermitOnChain,
 } from "../services/permitContract.js";
+import { pickCoinObjectIdForPayment, sponsoredExecute } from "../services/sponsoredTx.js";
 import type { AgentStatus, DbAgent } from "../types/db.js";
 
 const router = Router();
 
-const TX_OPTS = {
-  showEffects: true,
-  showBalanceChanges: true,
-} as const;
-
-const NANOS_PER_IOTA = 1_000_000_000n;
-/** Conservative buffer so amount + gas fits (gas paid from agent wallet). */
-const GAS_BUFFER_NANOS = 50_000_000n;
+/** Bridge transact: gas is sponsored by master; agent pays only the transfer amount from their coin. */
+const SPONSORED_TX_GAS_BUDGET = 50_000_000n;
 
 function jsonFail(
   res: Response,
@@ -34,10 +32,6 @@ function jsonFail(
   extra?: Record<string, unknown>,
 ): void {
   res.status(status).json({ success: false, error, message, ...extra });
-}
-
-function nanosToIotaNumber(n: bigint): number {
-  return Number(n) / 1_000_000_000;
 }
 
 /** DB-only permission check for /bridge/transact (on-chain path uses `authorizeSpendOnChain`). */
@@ -55,14 +49,14 @@ function checkDbTransactPermissions(
     };
   }
   if (profile === "low_value") {
-    if (amountNanos > 5n * NANOS_PER_IOTA) {
+    if (amountNanos > 5n * NANOS_PER_IOTA_BI) {
       return {
         ok: false,
         error: "tx_limit",
         message: "Per-transaction limit exceeded (max 5 IOTA for low_value)",
       };
     }
-    if (spentToday + amountNanos > 20n * NANOS_PER_IOTA) {
+    if (spentToday + amountNanos > 20n * NANOS_PER_IOTA_BI) {
       return {
         ok: false,
         error: "daily_limit",
@@ -151,27 +145,6 @@ router.post("/check", requireAgentToken, async (req, res) => {
       });
       return;
     }
-    if (a.taskType === "shipment_monitor" && a.taskConfig?.shipmentId) {
-      const ship = await db.findShipmentById(a.taskConfig.shipmentId);
-      if (!ship) {
-        res.json({
-          conditionMet: false,
-          data: { shipmentId: a.taskConfig.shipmentId, error: "shipment_not_found" },
-        });
-        return;
-      }
-      const conditionMet = ship.status === "delivered";
-      res.json({
-        conditionMet,
-        data: {
-          shipmentId: ship.id,
-          currentStatus: ship.status,
-          product: ship.product,
-          destination: ship.destination,
-        },
-      });
-      return;
-    }
     res.json({ conditionMet: false, data: { reason: "no_monitor_config" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Check error";
@@ -210,11 +183,12 @@ router.post("/execute", requireAgentToken, async (req, res) => {
       return;
     }
 
-    const taskAmount =
-      typeof a.taskConfig?.amountNanos === "number"
-        ? BigInt(Math.floor(a.taskConfig.amountNanos))
-        : 50_000_000n;
-    const amountNanos = taskAmount;
+    let amountNanos: bigint;
+    if (typeof a.taskConfig?.amountNanos === "number") {
+      amountNanos = BigInt(Math.floor(a.taskConfig.amountNanos)); // taskConfig.amountNanos — nanos
+    } else {
+      amountNanos = 50_000_000n; // 0.05 IOTA in nanos when task amount not specified
+    }
 
     const limits = getPermissionLimits(a);
     const today = utcDateString();
@@ -271,17 +245,15 @@ router.post("/execute", requireAgentToken, async (req, res) => {
         : owner.walletAddress;
 
     const { keypair } = deriveAgentKeypair(a.ownerProviderId, owner.walletAddress, a.agentIndex);
+    const from = keypair.getPublicKey().toIotaAddress();
 
     const client = new IotaClient({ url: getNodeUrl() });
+    const coinId = await pickCoinObjectIdForPayment(client, from, amountNanos);
     const tx = new Transaction();
-    const [coin] = tx.splitCoins(tx.gas, [amountNanos]);
+    const [coin] = tx.splitCoins(tx.object(coinId), [amountNanos]);
     tx.transferObjects([coin], recipient);
 
-    const result = await client.signAndExecuteTransaction({
-      transaction: tx,
-      signer: keypair,
-      options: TX_OPTS,
-    });
+    const result = await sponsoredExecute(tx, keypair, client, { gasBudget: SPONSORED_TX_GAS_BUDGET });
 
     if (!usedOnChainPermit) {
       const newSpent = spentToday + amountNanos;
@@ -291,21 +263,18 @@ router.post("/execute", requireAgentToken, async (req, res) => {
       });
     }
 
-    let remainingDailyBudget: number;
+    let remainingDailyBudgetNanos: bigint;
     if (usedOnChainPermit && a.permitObjectId) {
       const info = await getPermitInfo(a.permitObjectId);
       if (info) {
         const rem = BigInt(info.maxPerDay) - BigInt(info.spentToday);
-        remainingDailyBudget = Number(rem > 0n ? rem : 0n);
+        remainingDailyBudgetNanos = rem > 0n ? rem : 0n;
       } else {
-        remainingDailyBudget = 0;
+        remainingDailyBudgetNanos = 0n;
       }
     } else {
-      remainingDailyBudget = Number(limits.maxPerDay - spentToday - amountNanos);
-    }
-
-    if (a.taskType === "shipment_monitor" && a.taskConfig?.shipmentId && action === "release_payment") {
-      await db.updateShipmentById(a.taskConfig.shipmentId, { status: "payment_released" });
+      const rem = limits.maxPerDay - spentToday - amountNanos;
+      remainingDailyBudgetNanos = rem > 0n ? rem : 0n;
     }
 
     await db.addAgentLog({
@@ -314,7 +283,7 @@ router.post("/execute", requireAgentToken, async (req, res) => {
       message: `bridge_execute ${action}`,
       meta: {
         txHash: result.digest,
-        amountNanos: amountNanos.toString(),
+        amountNanos: amountNanos.toString(), // nanos
         recipient,
         action,
       },
@@ -323,8 +292,10 @@ router.post("/execute", requireAgentToken, async (req, res) => {
     res.json({
       success: true,
       txHash: result.digest,
-      amount: Number(amountNanos),
-      remainingDailyBudget,
+      amountNanos: amountNanos.toString(),
+      amountIota: nanosToIota(amountNanos),
+      remainingDailyBudgetNanos: remainingDailyBudgetNanos.toString(),
+      remainingDailyBudgetIota: nanosToIota(remainingDailyBudgetNanos),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Execute error";
@@ -332,6 +303,10 @@ router.post("/execute", requireAgentToken, async (req, res) => {
   }
 });
 
+/**
+ * Generic IOTA transfer from the agent wallet (sponsored gas).
+ * Body: `{ to, amount, unit?: "nanos" | "iota", memo? }` — default **nanos**; use `"unit":"iota"` for human IOTA amounts.
+ */
 router.post("/transact", requireAgentToken, async (req, res) => {
   try {
     const a = req.agent!;
@@ -352,6 +327,9 @@ router.post("/transact", requireAgentToken, async (req, res) => {
     const rawTo = req.body?.to;
     const rawAmount = req.body?.amount;
     const memoRaw = req.body?.memo;
+    /** Default `nanos`; use `iota` for human amounts (e.g. 5 = 5 IOTA). */
+    const unitRaw = req.body?.unit;
+    const unit = unitRaw === "iota" ? "iota" : "nanos";
 
     if (typeof rawTo !== "string" || !rawTo.trim()) {
       jsonFail(res, 400, "invalid_body", 'Missing or invalid "to" address');
@@ -375,7 +353,8 @@ router.post("/transact", requireAgentToken, async (req, res) => {
       jsonFail(res, 400, "invalid_body", "amount must be a positive number");
       return;
     }
-    const amountNanos = BigInt(Math.round(amountNum * 1_000_000_000));
+    const amountNanos =
+      unit === "iota" ? iotaToNanos(amountNum) : BigInt(Math.floor(amountNum));
     if (amountNanos <= 0n) {
       jsonFail(res, 400, "invalid_body", "amount must be a positive number");
       return;
@@ -445,22 +424,20 @@ router.post("/transact", requireAgentToken, async (req, res) => {
     const client = new IotaClient({ url: getNodeUrl() });
     const { totalBalance } = await client.getBalance({ owner: from });
     const balanceNanos = BigInt(totalBalance);
-    if (balanceNanos < amountNanos + GAS_BUFFER_NANOS) {
+    if (balanceNanos < amountNanos) {
       jsonFail(res, 400, "insufficient_balance", "Insufficient balance", {
-        walletBalance: nanosToIotaNumber(balanceNanos),
+        walletBalanceNanos: balanceNanos.toString(),
+        walletBalanceIota: nanosToIota(balanceNanos),
       });
       return;
     }
 
+    const coinId = await pickCoinObjectIdForPayment(client, from, amountNanos);
     const tx = new Transaction();
-    const [coin] = tx.splitCoins(tx.gas, [amountNanos]);
+    const [coin] = tx.splitCoins(tx.object(coinId), [amountNanos]);
     tx.transferObjects([coin], to);
 
-    const result = await client.signAndExecuteTransaction({
-      transaction: tx,
-      signer: keypair,
-      options: TX_OPTS,
-    });
+    const result = await sponsoredExecute(tx, keypair, client, { gasBudget: SPONSORED_TX_GAS_BUDGET });
 
     if (!usedOnChainPermit) {
       const newSpent = spentToday + amountNanos;
@@ -472,26 +449,25 @@ router.post("/transact", requireAgentToken, async (req, res) => {
 
     const { totalBalance: afterBal } = await client.getBalance({ owner: from });
     const balanceAfterNanos = BigInt(afterBal);
-    const walletBalance = nanosToIotaNumber(balanceAfterNanos);
 
-    let remainingDailyBudget: number;
+    let remainingDailyBudgetNanos: bigint;
     if (usedOnChainPermit && a.permitObjectId) {
       const info = await getPermitInfo(a.permitObjectId);
       if (info) {
         const rem = BigInt(info.maxPerDay) - BigInt(info.spentToday);
-        remainingDailyBudget = nanosToIotaNumber(rem > 0n ? rem : 0n);
+        remainingDailyBudgetNanos = rem > 0n ? rem : 0n;
       } else {
-        remainingDailyBudget = 0;
+        remainingDailyBudgetNanos = 0n;
       }
     } else {
       const newSpent = spentToday + amountNanos;
       const limits = getPermissionLimits(a);
       if (a.permissionProfile === "low_value") {
-        const rem = 20n * NANOS_PER_IOTA - newSpent;
-        remainingDailyBudget = nanosToIotaNumber(rem > 0n ? rem : 0n);
+        const rem = 20n * NANOS_PER_IOTA_BI - newSpent;
+        remainingDailyBudgetNanos = rem > 0n ? rem : 0n;
       } else {
         const rem = limits.maxPerDay - newSpent;
-        remainingDailyBudget = nanosToIotaNumber(rem > 0n ? rem : 0n);
+        remainingDailyBudgetNanos = rem > 0n ? rem : 0n;
       }
     }
 
@@ -503,9 +479,11 @@ router.post("/transact", requireAgentToken, async (req, res) => {
         type: "transact",
         txHash: result.digest,
         to,
-        amount: amountNum,
+        amountNanos: amountNanos.toString(),
+        amountIota: nanosToIota(amountNanos),
+        unit,
         memo: memo ?? null,
-        balance_after: walletBalance,
+        walletBalanceIota: nanosToIota(balanceAfterNanos),
       },
     });
 
@@ -514,10 +492,14 @@ router.post("/transact", requireAgentToken, async (req, res) => {
       txHash: result.digest,
       from,
       to,
-      amount: amountNum,
+      amountNanos: amountNanos.toString(),
+      amountIota: nanosToIota(amountNanos),
+      unit,
       memo: memo ?? null,
-      remainingDailyBudget,
-      walletBalance,
+      remainingDailyBudgetNanos: remainingDailyBudgetNanos.toString(),
+      remainingDailyBudgetIota: nanosToIota(remainingDailyBudgetNanos),
+      walletBalanceNanos: balanceAfterNanos.toString(),
+      walletBalanceIota: nanosToIota(balanceAfterNanos),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Transact error";
@@ -537,10 +519,12 @@ router.get("/status", requireAgentToken, async (req, res) => {
     }
 
     let balance = "0";
+    let balanceIota = 0;
     if (a.walletAddress) {
       const client = new IotaClient({ url: getNodeUrl() });
       const { totalBalance } = await client.getBalance({ owner: a.walletAddress });
       balance = totalBalance;
+      balanceIota = nanosToIota(BigInt(totalBalance));
     }
 
     let permissions: {
@@ -600,6 +584,8 @@ router.get("/status", requireAgentToken, async (req, res) => {
       permissionProfile: a.permissionProfile,
       walletAddress: a.walletAddress,
       balance,
+      balanceNanos: balance,
+      balanceIota,
       permitObjectId: a.permitObjectId ?? null,
       activatedAt: a.activatedAt ?? null,
       createdAt: a.createdAt,
@@ -632,11 +618,21 @@ router.post("/revoke", requireJwt, async (req, res) => {
     }
     await db.updateAgentByDid(a.agentDid, { status: "revoked", active: false });
     if (a.permitObjectId) {
-      const rev = await revokePermitOnChain(a.permitObjectId);
-      if (rev.success && rev.txHash) {
-        console.log(`[bridge/revoke] AgentPermit revoked on-chain: ${rev.txHash}`);
+      const owner = await db.findUserByProvider(jwtUser.providerId, jwtUser.providerType);
+      if (owner?.encryptedPrivateKey && owner.iv && owner.salt) {
+        try {
+          const ownerKp = Ed25519Keypair.fromSecretKey(decryptUserWalletSecret(owner));
+          const rev = await revokePermitOnChain(a.permitObjectId, ownerKp);
+          if (rev.success && rev.txHash) {
+            console.log(`[bridge/revoke] AgentPermit revoked on-chain: ${rev.txHash}`);
+          } else {
+            console.warn("[bridge/revoke] revoke_permit on-chain failed:", rev.error ?? "unknown");
+          }
+        } catch (e) {
+          console.warn("[bridge/revoke] revoke_permit on-chain error:", e);
+        }
       } else {
-        console.warn("[bridge/revoke] revoke_permit on-chain failed:", rev.error ?? "unknown");
+        console.warn("[bridge/revoke] skip on-chain revoke: user wallet key not on server");
       }
     }
     res.json({ status: "revoked" });

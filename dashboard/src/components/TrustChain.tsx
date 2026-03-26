@@ -75,7 +75,7 @@ export default function TrustChain({
 
           {agents.length === 0 ? (
             <p className="text-sm text-slate-500">
-              No delegates yet: add an agent to see delegation in the chain.
+              No delegates yet: add a delegate to see delegation in the chain.
             </p>
           ) : (
             <div className="flex flex-wrap items-start gap-x-4 gap-y-8 pl-0 md:pl-24">
@@ -87,7 +87,7 @@ export default function TrustChain({
                   <Arrow label="delegates" />
                   <Node>
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Agent DID
+                      Delegate DID
                     </p>
                     <p
                       className="mt-1 max-w-[200px] break-all font-mono text-xs text-[#e2e4ed]"

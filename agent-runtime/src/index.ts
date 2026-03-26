@@ -80,6 +80,10 @@ async function main(): Promise<void> {
 
   async function startAgentFromRow(row: DbAgent): Promise<void> {
     if (running.has(row.agentDid)) return;
+    if (!row.encryptedPrivateKey || !row.iv || !row.salt) {
+      console.error(`[agent-runtime] Agent ${row.agentDid} senza chiave cifrata nel DB, skip`);
+      return;
+    }
     let seed: Uint8Array;
     try {
       seed = decryptAgentPrivateKey(

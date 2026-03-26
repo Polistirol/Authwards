@@ -1,40 +1,5 @@
 {
-    "users": [],
-    "agents": [],
-    "agentLogs":[],
-    "shipments": [
-      {
-        "id": "SHIP-001",
-        "trackingNumber": "1234567890",
-        "product": "Arabica Coffee - Batch #4821",
-        "origin": "Bogotá, Colombia",
-        "destination": "Genoa, Italy",
-        "status": "in_transit",
-        "supplier": "0xd739979ecb1304f60cbfdb2508303de85afb04e80e667644d81e43a79a1c3dbf",
-        "paymentAmount": 1,
-        "createdAt": "2026-03-20T10:00:00Z"
-      },
-      {
-        "id": "SHIP-002",
-        "trackingNumber": "0987654321",
-        "product": "Extra Virgin Olive Oil - Batch #1190",
-        "origin": "Kalamata, Greece",
-        "destination": "Rotterdam, Netherlands",
-        "status": "in_transit",
-        "supplier": "0xd739979ecb1304f60cbfdb2508303de85afb04e80e667644d81e43a79a1c3dbf",
-        "paymentAmount": 2,
-        "createdAt": "2026-03-20T11:00:00Z"
-      },
-      {
-        "id": "SHIP-003",
-        "trackingNumber": "555111222",
-        "product": "Extra Virgin Olive Oil - Batch #1458",
-        "origin": "Kalamata, Greece",
-        "destination": "Rotterdam, Netherlands",
-        "status": "in_transit",
-        "supplier": "0xd739979ecb1304f60cbfdb2508303de85afb04e80e667644d81e43a79a1c3dbf",
-        "paymentAmount": 2,
-        "createdAt": "2026-03-20T11:00:00Z"
-      }
-    ]
-  }
+  "users": [],
+  "agents": [],
+  "agentLogs": []
+}

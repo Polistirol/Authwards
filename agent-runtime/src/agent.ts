@@ -2,7 +2,7 @@ import type { IotaClient } from "@iota/iota-sdk/client";
 import { Ed25519Keypair } from "@iota/iota-sdk/keypairs/ed25519";
 
 import * as db from "./services/db.js";
-import { execute, executeShipmentRelease } from "./executor.js";
+import { execute } from "./executor.js";
 import * as monitor from "./monitor.js";
 import * as permissions from "./permissions.js";
 import type { DbAgent } from "./types/db.js";
@@ -15,12 +15,6 @@ export type AgentLogger = {
   iotaClient: IotaClient;
   payoutAddress: string;
 };
-
-function resolveTaskType(agent: DbAgent): "balance_monitor" | "shipment_monitor" {
-  const t = agent.taskType;
-  if (t === "shipment_monitor") return "shipment_monitor";
-  return "balance_monitor";
-}
 
 export class Agent {
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -54,7 +48,6 @@ export class Agent {
   async tick(): Promise<void> {
     const { agentConfig, logger, privateKeySeed, agentIotaAddress } = this;
     const { iotaClient, payoutAddress } = logger;
-    const taskType = resolveTaskType(agentConfig);
 
     try {
       let r: monitor.MonitorResult;
@@ -67,64 +60,13 @@ export class Agent {
         return;
       }
 
-      if (r.monitorKind === "shipment_status") {
-        if (r.shipmentCheckLog) {
-          await logger.log("check", r.shipmentCheckLog);
-        }
-        if (!r.conditionMet) return;
-      } else {
-        await logger.log("check", { checking: "balance condition" });
-        if (!r.conditionMet) {
-          await logger.log("check", { conditionMet: false, currentValue: r.currentValue, threshold: r.threshold });
-          return;
-        }
+      await logger.log("check", { checking: "balance condition" });
+      if (!r.conditionMet) {
+        await logger.log("check", { conditionMet: false, currentValue: r.currentValue, threshold: r.threshold });
+        return;
       }
 
       await logger.log("trigger", { conditionMet: true, currentValue: r.currentValue, threshold: r.threshold });
-
-      if (taskType === "shipment_monitor") {
-        const shipmentId = agentConfig.taskConfig?.shipmentId;
-        const action = agentConfig.taskConfig?.action;
-        if (!shipmentId || action !== "release_payment") {
-          await logger.log("error", { phase: "task", error: "taskConfig richiede shipmentId e action release_payment" });
-          return;
-        }
-
-        const shipment = await db.getShipment(shipmentId);
-        if (!shipment) {
-          await logger.log("error", { phase: "shipment", error: `Spedizione non trovata: ${shipmentId}` });
-          return;
-        }
-
-        const amountUnits = Math.max(1, Math.round(shipment.paymentAmount));
-        const daily = permissions.getDailySpent(agentConfig.agentDid);
-        const perm = permissions.checkPermission(agentConfig.permissionProfile, amountUnits, daily);
-        if (!perm.allowed) {
-          await logger.log("permission_denied", { reason: perm.reason });
-          return;
-        }
-
-        if (!payoutAddress) {
-          await logger.log("error", { phase: "payout", error: "Destinatario non configurato (AGENT_PAYOUT_ADDRESS)" });
-          return;
-        }
-
-        try {
-          const result = await executeShipmentRelease(agentConfig, privateKeySeed, iotaClient, payoutAddress);
-          permissions.recordSpend(agentConfig.agentDid, amountUnits);
-          await logger.log("tx_success", {
-            txHash: result.txHash,
-            shipmentId: result.shipmentId,
-            amount: result.amount,
-            action: "payment_released",
-          });
-        } catch (e) {
-          const err = e instanceof Error ? e.message : String(e);
-          console.error(`[agent ${agentConfig.agentDid}] execute error:`, err);
-          await logger.log("tx_fail", { error: err });
-        }
-        return;
-      }
 
       const daily = permissions.getDailySpent(agentConfig.agentDid);
       const amountUnits = Number(TX_AMOUNT_NANO);

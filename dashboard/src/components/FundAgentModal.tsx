@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { iotaToNanos } from "../lib/units";
+
 type FundAgentModalProps = {
   open: boolean;
   onClose: () => void;
@@ -34,7 +36,7 @@ export default function FundAgentModal({
       setError("Enter a valid IOTA amount (e.g. 0.1).");
       return;
     }
-    const nanos = Math.floor(n * 1e9);
+    const nanos = iotaToNanos(n);
     if (!token) return;
     setBusy(true);
     try {
@@ -44,7 +46,7 @@ export default function FundAgentModal({
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ to: toAddress, amount: nanos }),
+        body: JSON.stringify({ to: toAddress, amount: Number(nanos) }),
       });
       const json: unknown = await res.json();
       if (!res.ok) {
@@ -81,10 +83,10 @@ export default function FundAgentModal({
         }}
       >
         <h2 id="fund-title" className="text-xl font-semibold text-white">
-          Fund Agent
+          Fund delegate
         </h2>
         <p className="mt-2 text-sm text-slate-400">
-          Transfer IOTA from your connected wallet to the agent address.
+          Transfer IOTA from your connected wallet to the delegate wallet address.
         </p>
         <p className="mt-3 max-w-full break-all font-mono text-xs text-[#6ee7b7]">
           {toAddress}
