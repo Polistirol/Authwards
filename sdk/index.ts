@@ -31,6 +31,9 @@ export type {
   AgentTaskConfig,
 } from "./src/types";
 
+/** Default UI color tokens (optional override / reference for custom chrome). */
+export { AUTHWARDS_UI, AUTHWARDS_UI_RGBA } from "./src/theme";
+
 /** @deprecated Use `AuthwardsProvider`. */
 export { AuthwardsProvider as IotaAuthProvider } from "./src/AuthwardsProvider";
 /** @deprecated Use `AuthwardsProviderProps`. */

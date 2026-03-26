@@ -1,6 +1,8 @@
 import type { CSSProperties, MouseEvent, ReactElement } from "react";
 import { useCallback, useState } from "react";
 
+import { AUTHWARDS_UI, AUTHWARDS_UI_RGBA } from "./theme";
+
 export type LoginModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -25,14 +27,14 @@ const overlayStyle: CSSProperties = {
 };
 
 const cardStyle: CSSProperties = {
-  backgroundColor: "#14151c",
-  color: "#e8eaef",
+  backgroundColor: AUTHWARDS_UI.panel,
+  color: AUTHWARDS_UI.text,
   borderRadius: 14,
   padding: "28px 28px 24px",
   maxWidth: 420,
   width: "100%",
   boxShadow: "0 24px 48px rgba(0,0,0,0.45)",
-  border: "1px solid rgba(255,255,255,0.06)",
+  border: `1px solid rgba(148, 163, 184, 0.15)`,
 };
 
 const titleStyle: CSSProperties = {
@@ -92,9 +94,9 @@ const telegramButtonStyle: CSSProperties = {
 const walletButtonStyle: CSSProperties = {
   ...oauthButtonBase,
   marginTop: 0,
-  border: "1px solid rgba(110, 231, 183, 0.45)",
-  backgroundColor: "rgba(110, 231, 183, 0.08)",
-  color: "#6ee7b7",
+  border: `1px solid ${AUTHWARDS_UI_RGBA.accent45}`,
+  backgroundColor: AUTHWARDS_UI_RGBA.accent08,
+  color: AUTHWARDS_UI.accent,
 };
 
 const separatorWrap: CSSProperties = {
@@ -294,7 +296,7 @@ export function LoginModal({
         {walletErr === "WALLET_MISSING" ? (
           <p style={{ marginTop: 10, fontSize: "0.82rem", lineHeight: 1.45, color: "#a1a1aa" }}>
             IOTA wallet not found.{" "}
-            <a href={iotaWalletDownloadUrl} target="_blank" rel="noreferrer" style={{ color: "#6ee7b7" }}>
+            <a href={iotaWalletDownloadUrl} target="_blank" rel="noreferrer" style={{ color: AUTHWARDS_UI.accent }}>
               Install the IOTA wallet
             </a>{" "}
             to continue.

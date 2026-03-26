@@ -156,6 +156,72 @@ function getDidGasBudget(): bigint {
   return 100_000_000n;
 }
 
+/** Fullnode can return execute results before identity objects are fully visible to `apply()` — wait for indexing. */
+const CREATE_IDENTITY_TX_OPTIONS = {
+  showEffects: true,
+  showObjectChanges: true,
+  showEvents: true,
+  showBalanceChanges: true,
+} as const;
+
+/**
+ * Applies identity-wasm `CreateIdentity` effects. The RPC can return from `executeTransactionBlock`
+ * before object/effect data is complete enough for `apply()` — we wait for indexing first, then retry
+ * with refetched effects if the wasm layer still cannot resolve the identity.
+ */
+async function applyCreateIdentityFromTxDigest(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createIdentityTx: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readOnly: any,
+  client: IotaClient,
+  digest: string,
+  initialEffects: NonNullable<IotaTransactionBlockResponse["effects"]>,
+): Promise<{ didDocument: () => { id: () => { toString: () => string }; toJSON: () => Record<string, unknown> } }> {
+  let effects: IotaTransactionBlockResponse["effects"] = initialEffects;
+  try {
+    const waited = await client.waitForTransaction({
+      digest,
+      options: CREATE_IDENTITY_TX_OPTIONS,
+      pollInterval: 400,
+      timeout: 90_000,
+    });
+    if (waited.effects) {
+      effects = waited.effects;
+    }
+  } catch (e) {
+    console.warn("[did] waitForTransaction after createIdentity (using execute effects):", e);
+  }
+
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return (await createIdentityTx.apply(effects as never, readOnly)) as {
+        didDocument: () => { id: () => { toString: () => string }; toJSON: () => Record<string, unknown> };
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const retryable =
+        msg.includes("failed to find the correct identity") ||
+        msg.includes("unexpected response");
+      if (!retryable || attempt === maxAttempts) {
+        throw e;
+      }
+      console.warn(`[did] createIdentity.apply attempt ${attempt}/${maxAttempts}, refetching effects: ${msg}`);
+      await new Promise((r) => setTimeout(r, 350 * attempt));
+      const block = await client.getTransactionBlock({
+        digest,
+        options: CREATE_IDENTITY_TX_OPTIONS,
+      });
+      if (!block.effects) {
+        throw new Error("getTransactionBlock returned no effects after createIdentity execute");
+      }
+      effects = block.effects;
+    }
+  }
+  throw new Error("applyCreateIdentityFromTxDigest: exhausted retries");
+}
+
 async function getChainId(client: IotaClient): Promise<string> {
   if (!chainIdPromise) chainIdPromise = client.getChainIdentifier();
   return chainIdPromise;
@@ -204,7 +270,13 @@ export async function createDid(
   if (!result.effects) {
     throw new Error("DID creation transaction returned no effects");
   }
-  const identity = await createIdentityTx.apply(result.effects as never, identityClient.readOnly());
+  const identity = await applyCreateIdentityFromTxDigest(
+    createIdentityTx,
+    identityClient.readOnly(),
+    iotaClient,
+    result.digest,
+    result.effects,
+  );
   const doc = identity.didDocument();
   const did = doc.id().toString();
   const didDocument = doc.toJSON() as Record<string, unknown>;
@@ -321,7 +393,13 @@ export async function createAgentDid(params: {
   if (!result.effects) {
     throw new Error("Agent DID creation transaction returned no effects");
   }
-  const identity = await createIdentityTx.apply(result.effects as never, identityClient.readOnly());
+  const identity = await applyCreateIdentityFromTxDigest(
+    createIdentityTx,
+    identityClient.readOnly(),
+    iotaClient,
+    result.digest,
+    result.effects,
+  );
   const doc = identity.didDocument();
   return {
     did: doc.id().toString(),

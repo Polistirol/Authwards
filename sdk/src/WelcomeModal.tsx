@@ -2,8 +2,7 @@ import type { CSSProperties, ReactElement } from "react";
 import { useCallback, useMemo, useState } from "react";
 
 import { useAuthwards } from "./useAuthwards";
-
-const ACCENT = "#6ee7b7";
+import { AUTHWARDS_UI, AUTHWARDS_UI_RGBA } from "./theme";
 
 const overlayStyle: CSSProperties = {
   position: "fixed",
@@ -20,8 +19,8 @@ const overlayStyle: CSSProperties = {
 };
 
 const cardStyle: CSSProperties = {
-  backgroundColor: "#12131a",
-  color: "#e8eaef",
+  backgroundColor: AUTHWARDS_UI.panel,
+  color: AUTHWARDS_UI.text,
   borderRadius: 16,
   padding: 32,
   maxWidth: 520,
@@ -29,7 +28,7 @@ const cardStyle: CSSProperties = {
   maxHeight: "min(92vh, 900px)",
   overflowY: "auto",
   boxShadow: "0 24px 48px rgba(0,0,0,0.45)",
-  border: "1px solid #2a2d3a",
+  border: `1px solid ${AUTHWARDS_UI.border}`,
   boxSizing: "border-box",
 };
 
@@ -68,7 +67,7 @@ function MaskedPhrase({ phrase, revealed }: { phrase: string; revealed: boolean 
           wordBreak: "break-all",
           whiteSpace: "pre-wrap",
           margin: 0,
-          color: "#e2e4ed",
+          color: AUTHWARDS_UI.text,
           position: revealed ? "relative" : "absolute",
           inset: 0,
           opacity: revealed ? 1 : 0,
@@ -137,8 +136,8 @@ export function WelcomeModal(): ReactElement | null {
   const sectionBox: CSSProperties = {
     marginTop: 24,
     borderRadius: 12,
-    border: "1px solid #2a2d3a",
-    backgroundColor: "#161821",
+    border: `1px solid ${AUTHWARDS_UI.border}`,
+    backgroundColor: AUTHWARDS_UI.surface,
     padding: 20,
   };
 
@@ -154,12 +153,12 @@ export function WelcomeModal(): ReactElement | null {
   const smallBtn: CSSProperties = {
     flexShrink: 0,
     borderRadius: 8,
-    border: "1px solid #2a2d3a",
+    border: `1px solid ${AUTHWARDS_UI.border}`,
     backgroundColor: "rgba(255,255,255,0.05)",
     padding: "4px 10px",
     fontSize: 12,
     fontWeight: 600,
-    color: ACCENT,
+    color: AUTHWARDS_UI.accent,
     cursor: "pointer",
   };
 
@@ -183,10 +182,18 @@ export function WelcomeModal(): ReactElement | null {
               alignItems: "center",
               justifyContent: "center",
               borderRadius: "50%",
-              backgroundColor: "rgba(110, 231, 183, 0.15)",
+              backgroundColor: AUTHWARDS_UI_RGBA.accent15,
             }}
           >
-            <svg width={36} height={36} fill="none" viewBox="0 0 24 24" stroke={ACCENT} strokeWidth={2} aria-hidden>
+            <svg
+              width={36}
+              height={36}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke={AUTHWARDS_UI.accent}
+              strokeWidth={2}
+              aria-hidden
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
@@ -211,7 +218,14 @@ export function WelcomeModal(): ReactElement | null {
         <section style={sectionBox}>
           <p style={labelMuted}>Your DID</p>
           <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-            <code style={{ wordBreak: "break-all", fontSize: 14, color: ACCENT, fontFamily: "ui-monospace, monospace" }}>
+            <code
+              style={{
+                wordBreak: "break-all",
+                fontSize: 14,
+                color: AUTHWARDS_UI.accent,
+                fontFamily: "ui-monospace, monospace",
+              }}
+            >
               {did ? truncateMiddle(did) : "—"}
             </code>
             <button
@@ -230,7 +244,14 @@ export function WelcomeModal(): ReactElement | null {
 
           <p style={{ ...labelMuted, marginTop: 20 }}>Your wallet</p>
           <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-            <code style={{ wordBreak: "break-all", fontSize: 14, color: ACCENT, fontFamily: "ui-monospace, monospace" }}>
+            <code
+              style={{
+                wordBreak: "break-all",
+                fontSize: 14,
+                color: AUTHWARDS_UI.accent,
+                fontFamily: "ui-monospace, monospace",
+              }}
+            >
               {walletAddress ? truncateMiddle(walletAddress) : "—"}
             </code>
             <button
@@ -288,8 +309,8 @@ export function WelcomeModal(): ReactElement | null {
                 minWidth: 0,
                 flex: 1,
                 borderRadius: 8,
-                border: "1px solid rgba(110, 231, 183, 0.35)",
-                backgroundColor: "#0a0b0f",
+                border: `1px solid ${AUTHWARDS_UI_RGBA.accent35}`,
+                backgroundColor: AUTHWARDS_UI.inset,
                 padding: "12px 12px",
               }}
             >
@@ -303,11 +324,11 @@ export function WelcomeModal(): ReactElement | null {
                 width: 44,
                 flexShrink: 0,
                 borderRadius: 8,
-                border: "1px solid #2a2d3a",
+                border: `1px solid ${AUTHWARDS_UI.border}`,
                 backgroundColor: "rgba(255,255,255,0.05)",
                 fontSize: 18,
                 lineHeight: 1,
-                color: "#e2e4ed",
+                color: AUTHWARDS_UI.text,
                 cursor: "pointer",
               }}
               title={revealed ? "Hide" : "Show"}
@@ -324,12 +345,12 @@ export function WelcomeModal(): ReactElement | null {
               marginTop: 12,
               width: "100%",
               borderRadius: 8,
-              border: "1px solid #2a2d3a",
+              border: `1px solid ${AUTHWARDS_UI.border}`,
               backgroundColor: "rgba(255,255,255,0.05)",
               padding: "10px 16px",
               fontSize: 14,
               fontWeight: 600,
-              color: ACCENT,
+              color: AUTHWARDS_UI.accent,
               cursor: "pointer",
             }}
           >
@@ -337,7 +358,7 @@ export function WelcomeModal(): ReactElement | null {
           </button>
         </section>
 
-        <footer style={{ marginTop: 24, borderTop: "1px solid #2a2d3a", paddingTop: 24 }}>
+        <footer style={{ marginTop: 24, borderTop: `1px solid ${AUTHWARDS_UI.border}`, paddingTop: 24 }}>
           <label style={{ display: "flex", gap: 12, cursor: "pointer", fontSize: 14, color: "#cbd5e1" }}>
             <input
               type="checkbox"
@@ -348,7 +369,7 @@ export function WelcomeModal(): ReactElement | null {
                 width: 16,
                 height: 16,
                 flexShrink: 0,
-                accentColor: ACCENT,
+                accentColor: AUTHWARDS_UI.accent,
               }}
             />
             <span>I have saved my recovery key</span>
@@ -366,8 +387,8 @@ export function WelcomeModal(): ReactElement | null {
               padding: "14px 16px",
               fontSize: 14,
               fontWeight: 600,
-              backgroundColor: savedConfirm ? ACCENT : "#475569",
-              color: savedConfirm ? "#0a0b0f" : "#94a3b8",
+              backgroundColor: savedConfirm ? AUTHWARDS_UI.accent : "#475569",
+              color: savedConfirm ? AUTHWARDS_UI.onAccent : "#94a3b8",
               cursor: savedConfirm ? "pointer" : "not-allowed",
             }}
           >

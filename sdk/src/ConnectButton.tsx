@@ -14,8 +14,7 @@ import { createPortal } from "react-dom";
 import { useAuthwards } from "./useAuthwards";
 import { useWallet } from "./useWallet";
 import type { AuthProviderType, User } from "./types";
-
-const ACCENT = "#6ee7b7";
+import { AUTHWARDS_UI, AUTHWARDS_UI_RGBA } from "./theme";
 const DROPDOWN_MIN_WIDTH = 300;
 const DROPDOWN_Z = 9999;
 /** Explorer IOTA (path `/address/`, `/object/`). */
@@ -144,7 +143,7 @@ function ProviderBadge({ type }: { type: AuthProviderType }): ReactElement {
   }
   /* wallet */
   return (
-    <svg viewBox="0 0 24 24" style={{ ...common, fill: ACCENT }} aria-hidden>
+      <svg viewBox="0 0 24 24" style={{ ...common, fill: AUTHWARDS_UI.accent }} aria-hidden>
       <path d="M21 7.28V5c0-1.1-.9-2-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2.28A2 2 0 0 0 22 15v-6a2 2 0 0 0-1-1.72zM20 9v6h-7V9h7zM5 5h14v2h-6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h6v2H5V5z" />
       <path d="M16 12h2v2h-2z" />
     </svg>
@@ -216,14 +215,14 @@ export function ConnectButton({
       };
     }
     return {
-      surface: "#1e293b",
-      surface2: "#0f172a",
-      border: "rgba(255,255,255,0.12)",
-      text: "#f1f5f9",
-      muted: "#94a3b8",
+      surface: AUTHWARDS_UI.surface,
+      surface2: AUTHWARDS_UI.inset,
+      border: "rgba(148, 163, 184, 0.22)",
+      text: AUTHWARDS_UI.text,
+      muted: AUTHWARDS_UI.muted,
       hoverOverlay: "rgba(255,255,255,0.06)",
-      dropdownBg: "#14151c",
-      dropdownBorder: "rgba(255,255,255,0.1)",
+      dropdownBg: AUTHWARDS_UI.panel,
+      dropdownBorder: "rgba(148, 163, 184, 0.2)",
     };
   }, [theme]);
 
@@ -367,8 +366,8 @@ export function ConnectButton({
       borderRadius: 12,
       border: "none",
       cursor: authLoading ? "wait" : "pointer",
-      backgroundColor: ACCENT,
-      color: "#0f172a",
+      backgroundColor: AUTHWARDS_UI.accent,
+      color: AUTHWARDS_UI.onAccent,
       boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
       opacity: authLoading ? 0.75 : 1,
       transition: "filter 120ms ease, opacity 120ms ease",
@@ -514,7 +513,7 @@ export function ConnectButton({
               style={{
                 border: "none",
                 background: "transparent",
-                color: ACCENT,
+                color: AUTHWARDS_UI.accent,
                 fontSize: 11,
                 cursor: "pointer",
                 padding: 0,
@@ -591,8 +590,8 @@ export function ConnectButton({
                   onClick={() => void handleCopyDid()}
                   style={{
                     border: "none",
-                    background: "rgba(110,231,183,0.15)",
-                    color: ACCENT,
+                    background: AUTHWARDS_UI_RGBA.accent15,
+                    color: AUTHWARDS_UI.accent,
                     borderRadius: 6,
                     padding: "4px 8px",
                     fontSize: 10,
@@ -747,7 +746,7 @@ export function ConnectButton({
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor =
-            theme === "light" ? "#e2e8f0" : "#334155";
+            theme === "light" ? "#e2e8f0" : "rgba(51, 65, 85, 0.95)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = palette.surface;
