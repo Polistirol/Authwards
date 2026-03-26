@@ -1,6 +1,7 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { IotaClient } from "@iota/iota-sdk/client";
 import { Transaction } from "@iota/iota-sdk/transactions";
+import { normalizeIotaAddress } from "@iota/iota-sdk/utils";
 
 import { requireAgentToken } from "../middleware/agentAuth.js";
 import { requireJwt, type JwtUserPayload } from "../middleware/auth.js";
@@ -20,6 +21,73 @@ const TX_OPTS = {
   showEffects: true,
   showBalanceChanges: true,
 } as const;
+
+const NANOS_PER_IOTA = 1_000_000_000n;
+/** Conservative buffer so amount + gas fits (gas paid from agent wallet). */
+const GAS_BUFFER_NANOS = 50_000_000n;
+
+function jsonFail(
+  res: Response,
+  status: number,
+  error: string,
+  message: string,
+  extra?: Record<string, unknown>,
+): void {
+  res.status(status).json({ success: false, error, message, ...extra });
+}
+
+function nanosToIotaNumber(n: bigint): number {
+  return Number(n) / 1_000_000_000;
+}
+
+/** DB-only permission check for /bridge/transact (on-chain path uses `authorizeSpendOnChain`). */
+function checkDbTransactPermissions(
+  a: DbAgent,
+  amountNanos: bigint,
+  spentToday: bigint,
+): { ok: true } | { ok: false; error: string; message: string } {
+  const profile = a.permissionProfile;
+  if (profile === "readonly") {
+    return {
+      ok: false,
+      error: "readonly_permission",
+      message: "Agent has read-only permissions",
+    };
+  }
+  if (profile === "low_value") {
+    if (amountNanos > 5n * NANOS_PER_IOTA) {
+      return {
+        ok: false,
+        error: "tx_limit",
+        message: "Per-transaction limit exceeded (max 5 IOTA for low_value)",
+      };
+    }
+    if (spentToday + amountNanos > 20n * NANOS_PER_IOTA) {
+      return {
+        ok: false,
+        error: "daily_limit",
+        message: "Daily limit exceeded (max 20 IOTA for low_value)",
+      };
+    }
+    return { ok: true };
+  }
+  const limits = getPermissionLimits(a);
+  if (amountNanos > limits.maxPerTx) {
+    return {
+      ok: false,
+      error: "tx_limit",
+      message: "Per-transaction limit exceeded",
+    };
+  }
+  if (spentToday + amountNanos > limits.maxPerDay) {
+    return {
+      ok: false,
+      error: "daily_limit",
+      message: "Daily limit exceeded",
+    };
+  }
+  return { ok: true };
+}
 
 function getNodeUrl(): string {
   const url = process.env.IOTA_NODE_URL;
@@ -261,6 +329,199 @@ router.post("/execute", requireAgentToken, async (req, res) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Execute error";
     res.status(500).json({ error: msg });
+  }
+});
+
+router.post("/transact", requireAgentToken, async (req, res) => {
+  try {
+    const a = req.agent!;
+    const st = effectiveStatus(a);
+    if (st === "revoked") {
+      jsonFail(res, 403, "agent_revoked", "Agent revoked");
+      return;
+    }
+    if (st !== "active") {
+      jsonFail(res, 403, "agent_not_activated", "Agent must be activated from the dashboard");
+      return;
+    }
+    if (!requireBridgeAgent(a)) {
+      jsonFail(res, 400, "legacy_agent", "Agent must use Agent Bridge (re-create agent)");
+      return;
+    }
+
+    const rawTo = req.body?.to;
+    const rawAmount = req.body?.amount;
+    const memoRaw = req.body?.memo;
+
+    if (typeof rawTo !== "string" || !rawTo.trim()) {
+      jsonFail(res, 400, "invalid_body", 'Missing or invalid "to" address');
+      return;
+    }
+    let to: string;
+    try {
+      to = normalizeIotaAddress(rawTo.trim(), false, true);
+    } catch {
+      jsonFail(res, 400, "invalid_address", "Invalid IOTA address");
+      return;
+    }
+
+    const amountNum =
+      typeof rawAmount === "number"
+        ? rawAmount
+        : typeof rawAmount === "string"
+          ? Number.parseFloat(rawAmount)
+          : Number.NaN;
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      jsonFail(res, 400, "invalid_body", "amount must be a positive number");
+      return;
+    }
+    const amountNanos = BigInt(Math.round(amountNum * 1_000_000_000));
+    if (amountNanos <= 0n) {
+      jsonFail(res, 400, "invalid_body", "amount must be a positive number");
+      return;
+    }
+
+    if (memoRaw !== undefined && memoRaw !== null) {
+      if (typeof memoRaw !== "string") {
+        jsonFail(res, 400, "invalid_body", "memo must be a string");
+        return;
+      }
+      if (memoRaw.length > 256) {
+        jsonFail(res, 400, "memo_too_long", "memo must be at most 256 characters");
+        return;
+      }
+    }
+    const memo = typeof memoRaw === "string" ? memoRaw : undefined;
+
+    const owner = await db.findUserByProvider(a.ownerProviderId, a.ownerProviderType);
+    if (!owner?.walletAddress) {
+      jsonFail(res, 400, "owner_wallet_missing", "Owner wallet unavailable");
+      return;
+    }
+
+    const { keypair } = deriveAgentKeypair(a.ownerProviderId, owner.walletAddress, a.agentIndex);
+    const from = keypair.getPublicKey().toIotaAddress();
+
+    const today = utcDateString();
+    let spentToday = BigInt(a.spentTodayNanos ?? "0");
+    if (a.spentTodayDate !== today) {
+      spentToday = 0n;
+    }
+
+    let usedOnChainPermit = false;
+    if (a.permitObjectId) {
+      const auth = await authorizeSpendOnChain(a.permitObjectId, amountNanos);
+      if (auth.success) {
+        usedOnChainPermit = true;
+      } else if (auth.networkError || auth.error === "permit_package_missing") {
+        console.warn(
+          "[bridge/transact] On-chain permit not verifiable (network or package not configured), using db.json fallback",
+        );
+      } else {
+        const err = auth.error;
+        const msg =
+          err === "permit_expired"
+            ? "Permit expired"
+            : err === "permit_inactive"
+              ? "Permit revoked or inactive"
+              : err === "tx_limit"
+                ? "Per-transaction limit exceeded (on-chain)"
+                : err === "daily_limit"
+                  ? "Daily limit exceeded (on-chain)"
+                  : err;
+        jsonFail(res, 403, err, msg);
+        return;
+      }
+    }
+
+    if (!usedOnChainPermit) {
+      const dbCheck = checkDbTransactPermissions(a, amountNanos, spentToday);
+      if (!dbCheck.ok) {
+        jsonFail(res, 403, dbCheck.error, dbCheck.message);
+        return;
+      }
+    }
+
+    const client = new IotaClient({ url: getNodeUrl() });
+    const { totalBalance } = await client.getBalance({ owner: from });
+    const balanceNanos = BigInt(totalBalance);
+    if (balanceNanos < amountNanos + GAS_BUFFER_NANOS) {
+      jsonFail(res, 400, "insufficient_balance", "Insufficient balance", {
+        walletBalance: nanosToIotaNumber(balanceNanos),
+      });
+      return;
+    }
+
+    const tx = new Transaction();
+    const [coin] = tx.splitCoins(tx.gas, [amountNanos]);
+    tx.transferObjects([coin], to);
+
+    const result = await client.signAndExecuteTransaction({
+      transaction: tx,
+      signer: keypair,
+      options: TX_OPTS,
+    });
+
+    if (!usedOnChainPermit) {
+      const newSpent = spentToday + amountNanos;
+      await db.updateAgentByDid(a.agentDid, {
+        spentTodayNanos: newSpent.toString(),
+        spentTodayDate: today,
+      });
+    }
+
+    const { totalBalance: afterBal } = await client.getBalance({ owner: from });
+    const balanceAfterNanos = BigInt(afterBal);
+    const walletBalance = nanosToIotaNumber(balanceAfterNanos);
+
+    let remainingDailyBudget: number;
+    if (usedOnChainPermit && a.permitObjectId) {
+      const info = await getPermitInfo(a.permitObjectId);
+      if (info) {
+        const rem = BigInt(info.maxPerDay) - BigInt(info.spentToday);
+        remainingDailyBudget = nanosToIotaNumber(rem > 0n ? rem : 0n);
+      } else {
+        remainingDailyBudget = 0;
+      }
+    } else {
+      const newSpent = spentToday + amountNanos;
+      const limits = getPermissionLimits(a);
+      if (a.permissionProfile === "low_value") {
+        const rem = 20n * NANOS_PER_IOTA - newSpent;
+        remainingDailyBudget = nanosToIotaNumber(rem > 0n ? rem : 0n);
+      } else {
+        const rem = limits.maxPerDay - newSpent;
+        remainingDailyBudget = nanosToIotaNumber(rem > 0n ? rem : 0n);
+      }
+    }
+
+    await db.addAgentLog({
+      agentDid: a.agentDid,
+      createdAt: new Date().toISOString(),
+      message: "bridge_transact",
+      meta: {
+        type: "transact",
+        txHash: result.digest,
+        to,
+        amount: amountNum,
+        memo: memo ?? null,
+        balance_after: walletBalance,
+      },
+    });
+
+    res.json({
+      success: true,
+      txHash: result.digest,
+      from,
+      to,
+      amount: amountNum,
+      memo: memo ?? null,
+      remainingDailyBudget,
+      walletBalance,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Transact error";
+    jsonFail(res, 500, "server_error", msg);
   }
 });
 
