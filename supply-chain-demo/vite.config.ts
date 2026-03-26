@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +9,13 @@ import { defineConfig, loadEnv } from "vite";
 import { traceflowViteApiMiddleware } from "./server/traceflow-vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** npm workspaces hoist deps to the repo root; Netlify also installs from root. */
+function resolveHoistedPackage(pkg: string): string {
+  const local = path.join(__dirname, "node_modules", pkg);
+  if (fs.existsSync(local)) return local;
+  return path.join(__dirname, "..", "node_modules", pkg);
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, path.join(__dirname, ".."), "");
@@ -30,8 +38,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       dedupe: ["react", "react-dom"],
       alias: {
-        react: path.resolve(__dirname, "node_modules/react"),
-        "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+        react: resolveHoistedPackage("react"),
+        "react-dom": resolveHoistedPackage("react-dom"),
       },
     },
     server: {

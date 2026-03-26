@@ -351,7 +351,7 @@ export function ConnectButton({
   const toggleMenu = (e: MouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     if (!isAuthenticated) return;
-    setMenuOpen((o) => !o);
+    setMenuOpen((o: boolean) => !o);
   };
 
   const disconnectedButtonStyle: CSSProperties = useMemo(

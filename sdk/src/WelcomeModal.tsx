@@ -297,7 +297,7 @@ export function WelcomeModal(): ReactElement | null {
             </div>
             <button
               type="button"
-              onClick={() => setRevealed((r) => !r)}
+              onClick={() => setRevealed((r: boolean) => !r)}
               style={{
                 height: 44,
                 width: 44,

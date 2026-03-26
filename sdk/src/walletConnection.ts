@@ -58,9 +58,9 @@ function createStandardAdapter(wallet: Wallet): IotaWalletAdapter {
         | undefined;
       if (feat?.connect) {
         const { accounts } = await feat.connect({ silent: false });
-        return accounts.map((a) => ({ address: a.address }));
+        return accounts.map((a: { address: string }) => ({ address: a.address }));
       }
-      return wallet.accounts.map((a) => ({ address: a.address }));
+      return wallet.accounts.map((a: { address: string }) => ({ address: a.address }));
     },
     signPersonalMessage: async ({ message }) => {
       const f = wallet.features[IotaSignPersonalMessage] as

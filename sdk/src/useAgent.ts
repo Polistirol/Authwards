@@ -116,7 +116,7 @@ export function useAgent(): UseAgentResult {
   }, [token, loadAgents]);
 
   const setLogsReplace = useCallback((agentDid: string, logs: AgentLog[]): void => {
-    setAgentLogs((prev) => {
+    setAgentLogs((prev: Map<string, AgentLog[]>) => {
       const next = new Map(prev);
       next.set(agentDid, logs);
       return next;

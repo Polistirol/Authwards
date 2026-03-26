@@ -1,5 +1,6 @@
 [build]
-  command = "npm run build"
+  # Install from monorepo root so `node_modules` is hoisted to ../ — TypeScript resolves `react` / wallet packages from `../sdk` sources.
+  command = "cd .. && npm install && cd supply-chain-demo && npm run build"
   publish = "dist"
   functions = "netlify/functions"
 
