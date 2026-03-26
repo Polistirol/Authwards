@@ -3,8 +3,8 @@
 @layer base {
   html {
     font-family: system-ui, "Segoe UI", Roboto, sans-serif;
-    background-color: #0c1220;
-    color: #e2e8f0;
+    background-color: #f0f9ff;
+    color: #1e3a5f;
   }
 }
 
@@ -21,6 +21,11 @@
 
 .tf-modal-enter {
   animation: tf-modal-in 0.35s ease-out;
+}
+
+/* Native <select>: center label + options (dropdown list follows OS; closed field uses text-align-last) */
+.tf-demo-select option {
+  text-align: center;
 }
 
 .recovery-phrase-crossfade {

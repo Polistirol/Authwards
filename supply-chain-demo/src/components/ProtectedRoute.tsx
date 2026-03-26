@@ -8,7 +8,7 @@ export function ProtectedRoute({ children }: { children: ReactElement }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0c1220] text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-sky-50 text-sky-700">
         Loading…
       </div>
     );

@@ -118,7 +118,7 @@ function MaskedToken({
         {masked}
       </span>
       <span
-        className={`recovery-phrase-crossfade text-[#e2e4ed] selection:bg-[#6ee7b7]/30 ${
+        className={`recovery-phrase-crossfade text-slate-800 selection:bg-sky-200/60 ${
           revealed ? "relative opacity-100" : "pointer-events-none absolute inset-0 opacity-0"
         }`}
       >
@@ -131,7 +131,7 @@ function MaskedToken({
 function CodePreview({ code, className = "mt-3" }: { code: string; className?: string }) {
   return (
     <pre
-      className={`max-h-72 overflow-auto rounded-lg border border-[#2a2d3a] bg-[#0a0b0f] p-3 font-mono text-xs leading-relaxed text-slate-200 whitespace-pre ${className}`}
+      className={`max-h-72 overflow-auto rounded-lg border border-sky-200 bg-sky-50 p-3 font-mono text-xs leading-relaxed text-slate-800 whitespace-pre ${className}`}
     >
       {code}
     </pre>
@@ -314,7 +314,7 @@ export default function SnippetModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[220] flex items-center justify-center bg-black/65 p-4 backdrop-blur-[1px] pointer-events-auto"
+      className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px] pointer-events-auto"
       role="presentation"
       onClick={onClose}
     >
@@ -322,42 +322,42 @@ export default function SnippetModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="snippet-modal-title"
-        className="welcome-modal-enter max-h-[min(92vh,900px)] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-[#2a2d3a] bg-[#12131a] shadow-2xl"
+        className="welcome-modal-enter max-h-[min(92vh,900px)] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-sky-200 bg-white shadow-xl shadow-sky-200/40"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-[#2a2d3a] p-6">
+        <div className="border-b border-sky-200 p-6">
           <div className="flex items-start justify-between gap-4">
             <h2
               id="snippet-modal-title"
-              className="text-xl font-semibold text-white"
+              className="text-xl font-semibold text-sky-950"
             >
               Snippet workflow
             </h2>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-[#2a2d3a] px-3 py-1 text-sm text-slate-400 hover:bg-white/5"
+              className="rounded-lg border border-sky-200 px-3 py-1 text-sm text-sky-800 hover:bg-sky-50"
             >
               Close
             </button>
           </div>
 
           {pending ? (
-            <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <div className="mt-4 rounded-lg border border-sky-300 bg-sky-100 px-4 py-3 text-sm text-sky-950">
               This agent is not active yet. Activate it from the dashboard with the
               &quot;Activate Agent&quot; button; then connect the workflow using the files below.
             </div>
           ) : null}
 
-          <div className="mt-4 space-y-3 rounded-xl border border-[#2a2d3a] bg-[#161821] p-4">
+          <div className="mt-4 space-y-3 rounded-xl border border-sky-200 bg-sky-50/80 p-4">
             <div>
-              <p className="text-xs uppercase text-slate-500">Agent DID</p>
+              <p className="text-xs uppercase text-sky-600/80">Agent DID</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <code className="break-all text-sm text-[#6ee7b7]">{agentDid}</code>
+                <code className="break-all text-sm text-sky-800">{agentDid}</code>
                 <button
                   type="button"
                   onClick={() => void copyText("did", agentDid)}
-                  className="text-xs text-[#6ee7b7] underline"
+                  className="text-xs font-medium text-sky-600 underline hover:text-sky-900"
                 >
                   {copyMain === "did" ? "Copied ✓" : "Copy"}
                 </button>
@@ -365,52 +365,52 @@ export default function SnippetModal({
             </div>
             {data?.agentName ? (
               <div>
-                <p className="text-xs uppercase text-slate-500">Agent name</p>
-                <p className="mt-1 text-sm font-medium text-white">{data.agentName}</p>
+                <p className="text-xs uppercase text-sky-600/80">Agent name</p>
+                <p className="mt-1 text-sm font-medium text-sky-950">{data.agentName}</p>
               </div>
             ) : null}
             <div>
-              <p className="text-xs uppercase text-slate-500">Agent token</p>
+              <p className="text-xs uppercase text-sky-600/80">Agent token</p>
               <div className="relative mt-1 flex items-start gap-2">
-                <div className="min-h-[1.5rem] min-w-0 flex-1 rounded-lg border border-[#2a2d3a] bg-[#0a0b0f] px-3 py-2">
+                <div className="min-h-[1.5rem] min-w-0 flex-1 rounded-lg border border-sky-200 bg-white px-3 py-2">
                   {data?.agentToken ? (
                     <MaskedToken
                       token={data.agentToken}
                       revealed={tokenRevealed}
                     />
                   ) : (
-                    <span className="text-slate-500">—</span>
+                    <span className="text-sky-600/70">—</span>
                   )}
                 </div>
                 <button
                   type="button"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-sky-200 bg-white text-sky-700 hover:bg-sky-50"
                   title={tokenRevealed ? "Hide token" : "Show token"}
                   onClick={() => setTokenRevealed((v) => !v)}
                 >
                   {tokenRevealed ? <IconEyeOff /> : <IconEye />}
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-slate-500">
+              <p className="mt-1 text-[11px] text-sky-700/75">
                 The token is masked in the preview. Downloading or copying from the block below includes the
                 real token.
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase text-slate-500">Status</p>
-              <p className="mt-1 text-sm font-medium text-white">{statusLabel}</p>
+              <p className="text-xs uppercase text-sky-600/80">Status</p>
+              <p className="mt-1 text-sm font-medium text-sky-950">{statusLabel}</p>
             </div>
           </div>
         </div>
 
         <div className="p-6 pt-2">
           {loading ? (
-            <p className="text-sm text-slate-400">Loading snippet…</p>
+            <p className="text-sm text-sky-700/80">Loading snippet…</p>
           ) : error ? (
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="text-sm text-red-600">{error}</p>
           ) : data && currentProvider ? (
             <>
-              <div className="flex flex-wrap gap-2 border-b border-[#2a2d3a] pb-2">
+              <div className="flex flex-wrap gap-2 border-b border-sky-200 pb-2">
                 {TAB_ORDER.map(({ id, label }) => (
                   <button
                     key={id}
@@ -418,8 +418,8 @@ export default function SnippetModal({
                     onClick={() => setTab(id)}
                     className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                       tab === id
-                        ? "bg-[#6ee7b7]/15 text-[#6ee7b7]"
-                        : "text-slate-400 hover:bg-white/5"
+                        ? "bg-sky-200 text-sky-950"
+                        : "text-sky-700/80 hover:bg-sky-50"
                     }`}
                   >
                     {label}
@@ -428,23 +428,23 @@ export default function SnippetModal({
               </div>
 
               <div className="mt-4">
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-lg font-semibold text-sky-950">
                   {currentProvider.label}
                 </h3>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-sky-800/85">
                   {currentProvider.description}
                 </p>
 
                 {tab === "arduino" ? (
-                  <div className="mt-4 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
+                  <div className="mt-4 space-y-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
                     <p className="font-medium">Hardware</p>
                     <p>
                       Requires ESP32 or ESP8266 with WiFi. Set{" "}
-                      <code className="rounded bg-black/30 px-1">WIFI_SSID</code> and{" "}
-                      <code className="rounded bg-black/30 px-1">WIFI_PASS</code> to your network
+                      <code className="rounded bg-sky-200/80 px-1">WIFI_SSID</code> and{" "}
+                      <code className="rounded bg-sky-200/80 px-1">WIFI_PASS</code> to your network
                       credentials.
                     </p>
-                    <p className="text-amber-100/90">
+                    <p className="text-sky-900/90">
                       Librerie: <strong>WiFi</strong>, <strong>HTTPClient</strong>,{" "}
                       <strong>ArduinoJson</strong>
                     </p>
@@ -455,7 +455,7 @@ export default function SnippetModal({
                   <div className="mb-2 flex justify-end">
                     <button
                       type="button"
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-300 hover:bg-white/10"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-sky-200 bg-white text-sky-700 hover:bg-sky-50"
                       title={tokenRevealed ? "Hide token in code" : "Show token in code"}
                       onClick={() => setTokenRevealed((v) => !v)}
                     >
@@ -467,7 +467,7 @@ export default function SnippetModal({
                     <button
                       type="button"
                       onClick={handleDownload}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#6ee7b7]/40 bg-[#6ee7b7]/10 text-[#6ee7b7] hover:bg-[#6ee7b7]/20"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-sky-300 bg-sky-100 text-sky-800 hover:bg-sky-200/80"
                       title="Download file"
                     >
                       <IconDownload />
@@ -475,11 +475,11 @@ export default function SnippetModal({
                     <button
                       type="button"
                       onClick={() => void copyText(copyKey, downloadCode)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#2a2d3a] bg-white/5 text-slate-200 hover:bg-white/10"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-sky-200 bg-white text-sky-800 hover:bg-sky-50"
                       title={copyMain === copyKey ? "Copied" : "Copy to clipboard"}
                     >
                       {copyMain === copyKey ? (
-                        <IconCheck className="h-5 w-5 text-[#6ee7b7]" />
+                        <IconCheck className="h-5 w-5 text-sky-600" />
                       ) : (
                         <IconClipboard />
                       )}
@@ -489,7 +489,7 @@ export default function SnippetModal({
               </div>
             </>
           ) : data ? (
-            <p className="text-sm text-amber-200">
+            <p className="text-sm text-sky-800/90">
               Snippet content unavailable. Ensure the backend exposes the &quot;providers&quot; field.
             </p>
           ) : null}

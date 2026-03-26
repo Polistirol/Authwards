@@ -19,11 +19,11 @@ function effectiveStatus(agent: Agent): AgentStatus {
 function statusBadgeClass(s: AgentStatus): string {
   switch (s) {
     case "active":
-      return "border-emerald-500/50 bg-emerald-500/15 text-emerald-300";
+      return "border-cyan-300 bg-cyan-100 text-cyan-950";
     case "revoked":
-      return "border-red-500/50 bg-red-500/15 text-red-300";
+      return "border-red-200 bg-red-50 text-red-800";
     default:
-      return "border-amber-500/50 bg-amber-500/15 text-amber-200";
+      return "border-sky-300 bg-sky-100 text-sky-900";
   }
 }
 
@@ -111,16 +111,16 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
 
   return (
     <div
-      className="mt-4 rounded-xl border border-slate-600 bg-[#131a2a]/80 p-4"
+      className="mt-4 rounded-xl border border-sky-200 bg-sky-50/90 p-4 shadow-inner shadow-sky-100/50"
       onClick={(e) => e.stopPropagation()}
     >
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Agent</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-sky-700/80">Payment Agent</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <code className="text-sm text-amber-400">{truncateDid(agent.agentDid)}</code>
+        <code className="text-sm font-medium text-sky-800">{truncateDid(agent.agentDid)}</code>
         <button
           type="button"
           onClick={() => void copyDid()}
-          className="text-xs text-blue-400 underline hover:text-blue-300"
+          className="text-xs font-medium text-sky-600 underline decoration-sky-300 hover:text-sky-900"
         >
           {copied ? "Copied" : "Copy DID"}
         </button>
@@ -131,17 +131,17 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
         >
           {statusLabelEn(st)}
         </span>
-        <span className="text-sm text-slate-400">
+        <span className="text-sm text-sky-800/85">
           Balance:{" "}
-          <span className="font-medium text-slate-200">
+          <span className="font-medium text-sky-950">
             {balanceNanos !== null ? `${nanosToIota(balanceNanos)} IOTA` : "—"}
           </span>
         </span>
       </div>
-      <div className="mt-3 grid gap-1 text-sm text-slate-400">
+      <div className="mt-3 grid gap-1 text-sm text-sky-800/85">
         <p>
-          Permissions: max <span className="text-slate-200">{caps.maxPerTx}</span> / tx, max{" "}
-          <span className="text-slate-200">{caps.maxPerDay}</span> / day
+          Permissions: max <span className="text-sky-950">{caps.maxPerTx}</span> / tx, max{" "}
+          <span className="text-sky-950">{caps.maxPerDay}</span> / day
         </p>
         {agent.permitObjectId ? (
           <p>
@@ -149,7 +149,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
               href={explorerObjectUrl(agent.permitObjectId)}
               target="_blank"
               rel="noreferrer"
-              className="text-blue-400 underline hover:text-blue-300"
+              className="font-medium text-sky-600 underline decoration-sky-300 hover:text-sky-900"
             >
               View on-chain permissions
             </a>
@@ -160,7 +160,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
         <button
           type="button"
           onClick={() => setSnippetOpen(true)}
-          className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-500/20"
+          className="rounded-lg border border-sky-300 bg-sky-100 px-3 py-1.5 text-sm font-medium text-sky-900 hover:bg-sky-200/80"
         >
           View Snippet
         </button>
@@ -170,7 +170,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
             setFundError(null);
             setFundOpen(true);
           }}
-          className="rounded-lg border border-blue-500/50 bg-blue-500/10 px-3 py-1.5 text-sm font-medium text-blue-300 hover:bg-blue-500/20"
+          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-900 hover:bg-blue-100/80"
         >
           Fund Agent
         </button>
@@ -187,35 +187,35 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
 
       {fundOpen ? (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px]"
           role="presentation"
         >
           <div
-            className="tf-modal-enter w-full max-w-md rounded-xl border border-slate-600 bg-[#1e293b] p-6 shadow-xl"
+            className="tf-modal-enter w-full max-w-md rounded-xl border border-sky-200 bg-white p-6 shadow-xl shadow-sky-200/50"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-white">Fund Agent</h3>
-            <p className="mt-2 text-sm text-slate-400">
+            <h3 className="text-lg font-semibold text-sky-950">Fund Agent</h3>
+            <p className="mt-2 text-sm text-sky-800/85">
               Transfer IOTA from your user wallet to the agent wallet (testnet).
             </p>
-            <label className="mt-4 block text-sm text-slate-300">
+            <label className="mt-4 block text-sm text-sky-900">
               Amount (IOTA)
               <input
                 type="text"
                 inputMode="decimal"
                 value={fundAmount}
                 onChange={(e) => setFundAmount(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-[#0c1220] px-3 py-2 text-white"
+                className="mt-1 w-full rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-sky-950 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
               />
             </label>
-            {fundError ? <p className="mt-2 text-sm text-red-400">{fundError}</p> : null}
+            {fundError ? <p className="mt-2 text-sm text-red-600">{fundError}</p> : null}
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setFundOpen(false)}
-                className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+                className="rounded-lg border border-sky-200 bg-white px-4 py-2 text-sm text-sky-800 hover:bg-sky-50"
               >
                 Cancel
               </button>
@@ -223,7 +223,7 @@ export function AgentStatusCard({ agent }: AgentStatusCardProps) {
                 type="button"
                 disabled={walletLoading}
                 onClick={() => void handleFund()}
-                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-[#0c1220] hover:bg-amber-400 disabled:opacity-50"
+                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
               >
                 Send
               </button>

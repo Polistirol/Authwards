@@ -12,12 +12,12 @@ export function Landing() {
         <TraceFlowHeader
           right={
             <ConnectButton
-              theme="dark"
+              theme="light"
               frontendUrl={import.meta.env.VITE_FRONTEND_URL || undefined}
             />
           }
         />
-        <main className="mx-auto flex max-w-3xl flex-1 flex-col items-center justify-center px-4 py-16 text-center text-slate-400">
+        <main className="mx-auto flex max-w-3xl flex-1 flex-col items-center justify-center px-4 py-16 text-center text-sky-700/90">
           Loading…
         </main>
         <TraceFlowFooter />
@@ -34,21 +34,21 @@ export function Landing() {
       <TraceFlowHeader
         right={
           <ConnectButton
-            theme="dark"
+            theme="light"
             frontendUrl={import.meta.env.VITE_FRONTEND_URL || undefined}
           />
         }
       />
       <main className="mx-auto flex max-w-3xl flex-1 flex-col items-center justify-center px-4 py-16 text-center">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-amber-500/90">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-sky-500">
           Supply chain visibility
         </p>
-        <h1 className="mt-4 text-4xl font-bold tracking-tight text-white md:text-5xl">
+        <h1 className="mt-4 text-4xl font-bold tracking-tight text-sky-950 md:text-5xl">
           Track your shipments.
           <br />
-          <span className="text-amber-400">Automate payments.</span>
+          <span className="text-sky-600">Automate payments.</span>
         </h1>
-        <p className="mt-6 max-w-xl text-lg text-slate-400">
+        <p className="mt-6 max-w-xl text-lg text-sky-800/80">
           Sign in to monitor your shipments and delegate autonomous agents for supplier payments.
         </p>
       </main>

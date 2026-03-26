@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# :splat in the function *path* breaks routing. Pass the tail as a query param so the single `api` handler sees /shipments/...
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api?path=:splat"
+  status = 200
+  force = true
+
+# Optional: `npx netlify dev` proxies Vite. For day-to-day local API testing, `npm run dev` alone is enough — /api is handled by Vite middleware (server/traceflow-vite.ts).
+[dev]
+  command = "npm run dev"
+  targetPort = 5175
+  port = 8888
