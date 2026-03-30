@@ -23,9 +23,11 @@ export type Shipment = {
   status: "in_transit" | "delivered" | "payment_released" | string;
   supplierAddress: string;
   supplierDid: string;
-  receiverDid: string | null;
+  recipientDid: string;
   paymentAmount: number;
   txHash: string | null;
+  /** Present after delivery; cleared when status returns to in_transit (demo). */
+  deliveredAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

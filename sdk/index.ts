@@ -17,6 +17,9 @@ export type {
 export { useAgent } from "./src/useAgent";
 export type { CreateAgentInput, CreateAgentResult, UseAgentResult } from "./src/useAgent";
 
+export { useResolve } from "./src/useResolve";
+export type { UseResolveResult } from "./src/useResolve";
+
 export { LoginModal } from "./src/LoginModal";
 export type { LoginModalProps } from "./src/LoginModal";
 
@@ -33,6 +36,12 @@ export type {
   AgentLog,
   AgentStatus,
   AgentTaskConfig,
+  DelegateInfo,
+  DelegateResolution,
+  OwnerDelegatesResolution,
+  PermitInfo,
+  TrustChainVerification,
+  TxResolution,
 } from "./src/types";
 
 /** Default UI color tokens (optional override / reference for custom chrome). */

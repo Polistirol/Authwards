@@ -257,6 +257,26 @@ export async function findAgentByDid(agentDid: string): Promise<DbAgent | undefi
   return db.agents.find((a) => a.agentDid === agentDid);
 }
 
+/** Agents whose `ownerDid` matches (public trust-chain resolution). */
+export async function findAgentsByOwnerDid(ownerDid: string): Promise<DbAgent[]> {
+  const db = await readDb();
+  return db.agents.filter((a) => a.ownerDid === ownerDid);
+}
+
+/** Find user by IOTA wallet address (normalized compare). */
+export async function findUserByWalletAddress(walletAddress: string): Promise<DbUser | undefined> {
+  const norm = walletAddress.trim().toLowerCase();
+  const db = await readDb();
+  return db.users.find((u) => u.walletAddress && u.walletAddress.trim().toLowerCase() === norm);
+}
+
+/** Find agent by wallet address (normalized compare). */
+export async function findAgentByWalletAddress(walletAddress: string): Promise<DbAgent | undefined> {
+  const norm = walletAddress.trim().toLowerCase();
+  const db = await readDb();
+  return db.agents.find((a) => a.walletAddress && a.walletAddress.trim().toLowerCase() === norm);
+}
+
 export async function findAgentByToken(agentToken: string): Promise<DbAgent | undefined> {
   const db = await readDb();
   return db.agents.find((a) => a.agentToken === agentToken);

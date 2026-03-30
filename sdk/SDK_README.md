@@ -213,6 +213,34 @@ Must be used under `AuthwardsProvider`.
 
 ---
 
+### `useResolve()`
+
+Must be used under `AuthwardsProvider`. Calls the public **trust-chain resolution** endpoints on your `backendUrl` (no JWT): `GET /resolve/delegate/:did`, `GET /resolve/owner/:did/delegates`, `GET /resolve/tx/:txHash`. Use this to verify who signed an on-chain transaction and whether a delegate’s permit and DID document align with an owner.
+
+| Field | Type | Description |
+|------|------|-------------|
+| `resolveDelegate` | `(did: string) => Promise<DelegateResolution>` | Resolve a delegate DID → owner, permit, `trustChain`. Throws if the request fails (e.g. network). |
+| `resolveOwnerDelegates` | `(ownerDid: string) => Promise<OwnerDelegatesResolution>` | List delegates for an owner DID. |
+| `resolveTransaction` | `(txHash: string) => Promise<TxResolution>` | Inspect a transaction by digest: sender, optional delegate resolution, permit summary, `trustChain.verified`. |
+
+**Verify payment (e.g. after a bridge payment or when your app stores `txHash`):**
+
+```tsx
+import { useResolve } from "./index";
+
+// Verify payment using Authward SDK
+const { resolveTransaction } = useResolve();
+const result = await resolveTransaction(txHash);
+const verified =
+  result.trustChain.verified && result.ownerDid === shipment.receiverDid;
+```
+
+`shipment.receiverDid` is an example field from your domain model (e.g. the buyer DID you expect to control the paying delegate). Adjust the condition: for **direct** payments from the user wallet you may check `!result.isDelegate && result.senderDid === shipment.receiverDid` instead.
+
+Related types: `DelegateResolution`, `OwnerDelegatesResolution`, `TxResolution`, `PermitInfo`, `TrustChainVerification`, `DelegateInfo` (see below).
+
+---
+
 ### Exported types (`types.ts` and re-exports)
 
 Types exported from the package entry include:
@@ -224,6 +252,7 @@ Types exported from the package entry include:
 - **`AgentTaskConfig`**: optional `action`, `amountNanos`, `recipientAddress`
 - **`Agent`**: `agentDid`, `ownerDid`, optional `name`, `description`, `permissionProfile`, `permitMaxPerTxIota`, `permitMaxPerDayIota`, `permitExpiresAtMs`, `createdAt`, optional `active`, `walletAddress`, `status`, `activatedAt`, `spentTodayNanos`, `spentTodayDate`, masked `agentToken`, `taskType`, `taskConfig`, `permitObjectId`, optional `permitExplorerUrl`
 - **`AgentLog`**: `agentDid`, `timestamp`, `type`, `data`
+- **`DelegateResolution`**, **`TxResolution`**, **`OwnerDelegatesResolution`**, **`DelegateInfo`**, **`PermitInfo`**, **`TrustChainVerification`**: trust-chain / `/resolve` API shapes (see `useResolve()`).
 
 Deprecated: `IotaAuthConfig` (alias of `AuthwardsConfig`).
 

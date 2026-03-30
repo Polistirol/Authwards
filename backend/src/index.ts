@@ -16,6 +16,7 @@ import didRouter from "./routes/did.js";
 import walletRouter from "./routes/wallet.js";
 import adminRouter from "./routes/admin.js";
 import bridgeRouter from "./routes/bridge.js";
+import resolveRouter from "./routes/resolve.js";
 import { requestLogMiddleware } from "./requestLog.js";
 import { DB_INIT_PATH, DB_PATH } from "./paths.js";
 
@@ -50,6 +51,7 @@ app.use("/did", didRouter);
 app.use("/wallet", walletRouter);
 app.use("/admin", adminRouter);
 app.use("/bridge", bridgeRouter);
+app.use("/resolve", resolveRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Not found" });

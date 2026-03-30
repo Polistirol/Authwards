@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import type { Agent, AgentLog, AgentStatus } from "../../../sdk";
+import type { Agent, AgentStatus } from "../../../sdk";
 import { ConnectButton, useAgent, useAuthwards } from "../../../sdk";
 import { findAgentForShipment } from "../lib/agents";
-import { explorerDidUrl, explorerObjectUrl, explorerTxUrl } from "../lib/explorer";
+import { explorerTxUrl } from "../lib/explorer";
 import { truncateDid } from "../lib/format";
 import {
   fetchShipmentById,
@@ -12,6 +12,7 @@ import {
   type Shipment,
 } from "../lib/shipmentsApi";
 import { TraceFlowFooter, TraceFlowHeader, TraceFlowShell } from "../components/TraceFlowLayout";
+import { VerifyPayment } from "../components/VerifyPayment";
 
 function effectiveAgentStatus(agent: Agent): AgentStatus {
   if (agent.status === "pending_activation") return "created";
@@ -34,36 +35,76 @@ function formatShipmentStatus(status: string): string {
   }
 }
 
-function findPaymentLog(logs: AgentLog[]): AgentLog | undefined {
-  for (const log of logs) {
-    const d = log.data as { meta?: { txHash?: string } } | undefined;
-    const h = d?.meta?.txHash;
-    if (typeof h === "string" && h) return log;
+/** Select value: completed maps to API payment_released */
+function statusToSelectValue(status: string): string {
+  if (status === "payment_released") return "completed";
+  return status;
+}
+
+type TimelineEv = { title: string; time: string; extra?: string };
+
+function buildTimeline(shipment: Shipment, agent: Agent | undefined): TimelineEv[] {
+  const ev: TimelineEv[] = [];
+
+  if (shipment.status === "in_transit") {
+    ev.push({ title: "Shipment created", time: shipment.createdAt });
+    if (agent) {
+      ev.push({
+        title: `Agent identity created: ${truncateDid(agent.agentDid, 24, 12)}`,
+        time: agent.createdAt,
+        extra: agent.agentDid,
+      });
+      if (effectiveAgentStatus(agent) === "active" && agent.activatedAt) {
+        ev.push({ title: "Agent activated", time: agent.activatedAt });
+      }
+    }
+    return ev;
   }
-  return undefined;
+
+  ev.push({ title: "Shipment created", time: shipment.createdAt });
+  if (agent) {
+    ev.push({
+      title: `Agent identity created: ${truncateDid(agent.agentDid, 24, 12)}`,
+      time: agent.createdAt,
+      extra: agent.agentDid,
+    });
+    if (effectiveAgentStatus(agent) === "active" && agent.activatedAt) {
+      ev.push({ title: "Agent activated", time: agent.activatedAt });
+    }
+  }
+
+  if (shipment.status === "delivered" || shipment.status === "payment_released") {
+    const t = shipment.deliveredAt ?? shipment.updatedAt;
+    ev.push({ title: "Delivered — awaiting payment", time: t });
+  }
+
+  if (shipment.status === "payment_released") {
+    const h = shipment.txHash;
+    ev.push({
+      title: h ? `Payment released: ${truncateDid(h, 14, 12)}` : "Payment released",
+      time: shipment.updatedAt,
+      extra: h ?? undefined,
+    });
+  }
+
+  return ev;
 }
 
 export function ShipmentDetail() {
   const { id: rawId } = useParams();
   const id = rawId ? decodeURIComponent(rawId) : "";
-  const { user, token } = useAuthwards();
-  const { agents, fetchAgentLogs, agentLogs, refreshAgents } = useAgent();
+  const { user } = useAuthwards();
+  const { agents, refreshAgents } = useAgent();
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [demoBusy, setDemoBusy] = useState(false);
+  const [demoStatusBusy, setDemoStatusBusy] = useState(false);
 
   const agent = useMemo(
     () => (id ? findAgentForShipment(agents, id) : undefined),
     [agents, id],
   );
-
-  const logs = id && agent ? agentLogs.get(agent.agentDid) ?? [] : [];
-
-  const paymentLog = useMemo(() => findPaymentLog(logs), [logs]);
-  const txHashFromLogs = paymentLog
-    ? (paymentLog.data as { meta?: { txHash?: string } }).meta?.txHash
-    : undefined;
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -84,17 +125,12 @@ export function ShipmentDetail() {
     void load();
   }, [load]);
 
+  /** Poll TraceFlow while awaiting payment (delivered only). */
   useEffect(() => {
-    if (!id) return;
-    const interval = window.setInterval(() => void load(), 15_000);
+    if (!id || shipment?.status !== "delivered") return;
+    const interval = window.setInterval(() => void load(), 5_000);
     return () => window.clearInterval(interval);
-  }, [id, load]);
-
-  useEffect(() => {
-    if (agent?.agentDid && token) {
-      void fetchAgentLogs(agent.agentDid);
-    }
-  }, [agent?.agentDid, token, fetchAgentLogs]);
+  }, [id, load, shipment?.status]);
 
   async function handleDemoDeliver(): Promise<void> {
     if (!id) return;
@@ -109,10 +145,28 @@ export function ShipmentDetail() {
     }
   }
 
-  const chainTxHash =
-    shipment?.status === "payment_released" && shipment.txHash
-      ? shipment.txHash
-      : txHashFromLogs;
+  async function handleDemoStatusChange(next: string): Promise<void> {
+    if (!id) return;
+    setDemoStatusBusy(true);
+    try {
+      const apiStatus = next === "completed" ? "payment_released" : next;
+      const s = await patchShipmentStatus(id, apiStatus, undefined, { demo: true });
+      setShipment(s);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setDemoStatusBusy(false);
+    }
+  }
+
+  const timeline = useMemo(
+    () => (shipment ? buildTimeline(shipment, agent) : []),
+    [shipment, agent],
+  );
+
+  /** Full pipeline: payment released and on-chain tx recorded — required for VerifyPayment. */
+  const verificationComplete =
+    shipment?.status === "payment_released" && Boolean(shipment.txHash?.trim());
 
   if (!id) {
     return (
@@ -121,35 +175,6 @@ export function ShipmentDetail() {
         <main className="p-8 text-sky-700">Invalid shipment.</main>
       </TraceFlowShell>
     );
-  }
-
-  const timeline: { title: string; time: string; extra?: string }[] = [];
-
-  if (shipment) {
-    timeline.push({
-      title: "Shipment created",
-      time: shipment.createdAt,
-    });
-    if (agent) {
-      timeline.push({
-        title: `Agent identity created: ${truncateDid(agent.agentDid, 24, 12)}`,
-        time: agent.createdAt,
-        extra: agent.agentDid,
-      });
-      if (effectiveAgentStatus(agent) === "active" && agent.activatedAt) {
-        timeline.push({
-          title: "Agent activated",
-          time: agent.activatedAt,
-        });
-      }
-    }
-    if (chainTxHash) {
-      timeline.push({
-        title: `Payment released: ${chainTxHash}`,
-        time: shipment.updatedAt,
-        extra: chainTxHash,
-      });
-    }
   }
 
   return (
@@ -212,10 +237,14 @@ export function ShipmentDetail() {
                 <dd className="break-all font-mono text-xs text-sky-900/90">{shipment.supplierDid}</dd>
               </div>
               <div className="flex justify-between gap-4">
+                <dt className="text-sky-700/80">Recipient DID</dt>
+                <dd className="break-all font-mono text-xs text-sky-900/90">{shipment.recipientDid}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
                 <dt className="text-sky-700/80">Supplier wallet</dt>
                 <dd className="break-all font-mono text-xs text-sky-900/90">{shipment.supplierAddress}</dd>
               </div>
-              {shipment.status === "payment_released" && shipment.txHash ? (
+              {verificationComplete ? (
                 <div className="flex justify-between gap-4">
                   <dt className="text-sky-700/80">Payment tx</dt>
                   <dd className="break-all font-mono text-xs text-sky-900/90">{shipment.txHash}</dd>
@@ -223,11 +252,52 @@ export function ShipmentDetail() {
               ) : null}
             </dl>
 
+            <div className="mt-6 flex flex-col items-center gap-2 rounded-2xl border border-sky-200/90 bg-white/95 p-4 text-center shadow-md shadow-sky-100/50">
+              <label htmlFor="demo-status-detail" className="text-xs font-medium text-sky-700/80">
+                Status demo
+              </label>
+              <select
+                id="demo-status-detail"
+                value={statusToSelectValue(shipment.status)}
+                disabled={demoStatusBusy}
+                onChange={(e) => void handleDemoStatusChange(e.target.value)}
+                className="tf-demo-select w-full max-w-[11rem] rounded-lg border border-sky-200 bg-white px-3 py-2 text-center text-sm text-sky-950 shadow-inner shadow-sky-100 [text-align-last:center] outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
+              >
+                <option value="in_transit">in_transit</option>
+                <option value="delivered">delivered</option>
+                <option value="completed">completed</option>
+              </select>
+            </div>
+
+            {verificationComplete ? (
+              <section className="mt-6 rounded-2xl border border-sky-200/90 bg-white/95 p-5 text-sm shadow-md shadow-sky-100/50">
+                <h2 className="text-base font-semibold text-sky-950">Payment verification</h2>
+                <p className="mt-3 break-all font-mono text-xs text-sky-900/90">
+                  <span className="text-sky-700/80">Transaction: </span>
+                  {shipment.txHash}{" "}
+                  <a
+                    href={explorerTxUrl(shipment.txHash!)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-sans font-medium text-sky-600 underline decoration-sky-300 hover:text-sky-800"
+                  >
+                    ↗
+                  </a>
+                </p>
+                <div className="mt-4">
+                  <VerifyPayment
+                    txHash={shipment.txHash!}
+                    expectedReceiverDid={user?.did ?? shipment.recipientDid}
+                  />
+                </div>
+              </section>
+            ) : null}
+
             <div className="mt-10">
               <h2 className="text-lg font-semibold text-sky-950">Timeline</h2>
               <ul className="relative mt-4 space-y-0 border-l-2 border-sky-300 pl-6">
                 {timeline.map((ev, i) => (
-                  <li key={`${ev.title}-${i}`} className="relative pb-8 last:pb-0">
+                  <li key={`${ev.title}-${ev.time}-${i}`} className="relative pb-8 last:pb-0">
                     <span className="absolute -left-[31px] top-1.5 h-3 w-3 rounded-full border-2 border-sky-500 bg-sky-50" />
                     <p className="font-medium text-sky-900">{ev.title}</p>
                     {ev.time ? (
@@ -259,61 +329,6 @@ export function ShipmentDetail() {
               </button>
             </div>
 
-            <section className="mt-12">
-              <h2 className="text-lg font-semibold text-sky-950">Trust chain</h2>
-              <div className="mt-6 flex flex-col items-stretch gap-4 md:flex-row md:flex-wrap md:items-center md:justify-center">
-                {user ? (
-                  <>
-                    <TrustNode
-                      title="Your Google Account"
-                      subtitle={user.email ?? user.providerId}
-                      icon={
-                        user.picture ? (
-                          <img src={user.picture} alt="" className="h-10 w-10 rounded-full" />
-                        ) : (
-                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-200 text-xs text-sky-900">
-                            {user.providerType}
-                          </span>
-                        )
-                      }
-                    />
-                    <Arrow />
-                    <TrustNode
-                      title="Your DID"
-                      subtitle={truncateDid(user.did)}
-                      link={explorerDidUrl(user.did)}
-                    />
-                    <Arrow />
-                    {agent ? (
-                      <>
-                        <TrustNode
-                          title="Agent DID + On-chain Permissions"
-                          subtitle={truncateDid(agent.agentDid)}
-                          link={explorerDidUrl(agent.agentDid)}
-                          extraLink={
-                            agent.permitObjectId
-                              ? {
-                                  label: "View on-chain permissions",
-                                  href: explorerObjectUrl(agent.permitObjectId),
-                                }
-                              : undefined
-                          }
-                        />
-                        <Arrow />
-                        <TrustNode
-                          title="Transaction: supplier payment"
-                          subtitle={chainTxHash ? truncateDid(chainTxHash, 12, 12) : "Pending"}
-                          link={chainTxHash ? explorerTxUrl(chainTxHash) : undefined}
-                        />
-                      </>
-                    ) : (
-                      <TrustNode title="Agent" subtitle="Not configured for this shipment" />
-                    )}
-                  </>
-                ) : null}
-              </div>
-            </section>
-
             {shipment.status === "in_transit" ? (
               <div className="mt-16 border-t border-sky-200 pt-8 text-center">
                 <button
@@ -332,59 +347,4 @@ export function ShipmentDetail() {
       <TraceFlowFooter />
     </TraceFlowShell>
   );
-}
-
-function Arrow() {
-  return (
-    <div className="flex justify-center text-2xl text-sky-400 md:px-2">
-      <span aria-hidden className="rotate-90 md:rotate-0">
-        →
-      </span>
-    </div>
-  );
-}
-
-function TrustNode({
-  title,
-  subtitle,
-  link,
-  extraLink,
-  icon,
-}: {
-  title: string;
-  subtitle: string;
-  link?: string;
-  extraLink?: { label: string; href: string };
-  icon?: ReactNode;
-}) {
-  const inner = (
-    <div className="min-w-[200px] max-w-xs rounded-xl border border-sky-200 bg-white/95 px-4 py-3 text-center shadow-md shadow-sky-100/60">
-      <div className="flex flex-col items-center gap-2">
-        {icon}
-        <p className="text-xs font-semibold uppercase tracking-wide text-sky-600/80">{title}</p>
-        <p className="break-all text-sm text-sky-950">{subtitle}</p>
-        {link ? (
-          <a
-            href={link}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-medium text-sky-600 underline decoration-sky-300 hover:text-sky-800"
-          >
-            Explorer
-          </a>
-        ) : null}
-        {extraLink ? (
-          <a
-            href={extraLink.href}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-medium text-cyan-700 underline decoration-cyan-300 hover:text-cyan-900"
-          >
-            {extraLink.label}
-          </a>
-        ) : null}
-      </div>
-    </div>
-  );
-  return inner;
 }

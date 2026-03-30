@@ -2,6 +2,8 @@
  * TraceFlow shipment API — shared logic (no Netlify / Vite imports).
  */
 
+
+
 export type Shipment = {
   id: string;
   trackingNumber: string;
@@ -11,9 +13,11 @@ export type Shipment = {
   status: "in_transit" | "delivered" | "payment_released";
   supplierAddress: string;
   supplierDid: string;
-  receiverDid: string | null;
+  recipientDid: string;
   paymentAmount: number;
   txHash: string | null;
+  /** Set when the shipment reaches `delivered`; cleared when demo resets to `in_transit`. */
+  deliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -27,10 +31,11 @@ const initialShipments: Shipment[] = [
     destination: "Genova, Italia",
     status: "in_transit",
     supplierAddress: "0xad3f8f9c6e6f51d82bcc448b9b53280067cd0bc91f81561dc5d5b576ed642d84",
-    supplierDid: "did:iota:testnet:0xf6ca19ce38f6ba2ac5893e6f0dfa7e41aa8b358a2bdf05e16e0f1cf5c0876720",
-    receiverDid: null,
+    supplierDid: "did:iota:testnet:0x33bd4c85972ed72636f1bbe196d40ed2669e2f90bdf14a558dd8a43f9f0d744c",
+    recipientDid: "did:iota:0xc44e4c3516667592166d9e1f1b035dc072720e22a651c831b0ea80788582554e",
     paymentAmount: 1,
     txHash: null,
+    deliveredAt: null,
     createdAt: "2026-03-20T10:00:00Z",
     updatedAt: "2026-03-20T10:00:00Z",
   },
@@ -42,10 +47,11 @@ const initialShipments: Shipment[] = [
     destination: "Rotterdam, Paesi Bassi",
     status: "in_transit",
     supplierAddress: "0xad3f8f9c6e6f51d82bcc448b9b53280067cd0bc91f81561dc5d5b576ed642d84",
-    supplierDid: "did:iota:testnet:0xf6ca19ce38f6ba2ac5893e6f0dfa7e41aa8b358a2bdf05e16e0f1cf5c0876720",
-    receiverDid: null,
+    supplierDid: "did:iota:testnet:0x33bd4c85972ed72636f1bbe196d40ed2669e2f90bdf14a558dd8a43f9f0d744c",
+    recipientDid: "did:iota:0xc44e4c3516667592166d9e1f1b035dc072720e22a651c831b0ea80788582554e",
     paymentAmount: 0.5,
     txHash: null,
+    deliveredAt: null,
     createdAt: "2026-03-20T11:00:00Z",
     updatedAt: "2026-03-20T11:00:00Z",
   },
@@ -78,10 +84,32 @@ function patchShipment(
     if (next !== "in_transit" && next !== "delivered" && next !== "payment_released") {
       return { ok: false, error: "invalid_status" };
     }
+    if (next === "in_transit") {
+      shipments[idx] = {
+        ...cur,
+        status: "in_transit",
+        txHash: null,
+        deliveredAt: null,
+        updatedAt: now,
+      };
+      return { ok: true, shipment: { ...shipments[idx] } };
+    }
+    if (next === "delivered") {
+      shipments[idx] = {
+        ...cur,
+        status: "delivered",
+        txHash: null,
+        deliveredAt: now,
+        updatedAt: now,
+      };
+      return { ok: true, shipment: { ...shipments[idx] } };
+    }
+    /* payment_released */
     shipments[idx] = {
       ...cur,
-      status: next,
-      txHash: next === "payment_released" ? (body.txHash ?? cur.txHash) : null,
+      status: "payment_released",
+      txHash: body.txHash ?? cur.txHash,
+      deliveredAt: cur.deliveredAt ?? now,
       updatedAt: now,
     };
     return { ok: true, shipment: { ...shipments[idx] } };
@@ -91,6 +119,7 @@ function patchShipment(
     shipments[idx] = {
       ...cur,
       status: "delivered",
+      deliveredAt: now,
       updatedAt: now,
     };
     return { ok: true, shipment: { ...shipments[idx] } };

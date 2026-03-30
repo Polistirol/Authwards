@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ConnectButton, useAgent } from "../../../sdk";
@@ -13,7 +13,7 @@ export function Shipments() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  const refreshShipments = async (): Promise<void> => {
+  const load = useCallback(async (): Promise<void> => {
     try {
       const list = await fetchShipments();
       setShipments(list);
@@ -21,30 +21,23 @@ export function Shipments() {
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : "Failed to load");
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load(): Promise<void> {
-      try {
-        const list = await fetchShipments();
-        if (!cancelled) {
-          setShipments(list);
-          setLoadErr(null);
-        }
-      } catch (e) {
-        if (!cancelled) setLoadErr(e instanceof Error ? e.message : "Failed to load");
-      }
-    }
-
     void load();
-    const id = window.setInterval(() => void load(), 15_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, []);
+  }, [load]);
+
+  const hasDeliveredAwaitingPayment = useMemo(
+    () => shipments.some((s) => s.status === "delivered"),
+    [shipments],
+  );
+
+  /** Poll only while at least one shipment is delivered (awaiting payment). */
+  useEffect(() => {
+    if (!hasDeliveredAwaitingPayment) return;
+    const id = window.setInterval(() => void load(), 5_000);
+    return () => window.clearInterval(id);
+  }, [hasDeliveredAwaitingPayment, load]);
 
   return (
     <TraceFlowShell>
@@ -69,12 +62,7 @@ export function Shipments() {
 
         <div className="mt-8 flex flex-col gap-6">
           {shipments.map((s) => (
-            <ShipmentCard
-              key={s.id}
-              shipment={s}
-              agent={findAgentForShipment(agents, s.id)}
-              onAfterDemoStatusChange={refreshShipments}
-            />
+            <ShipmentCard key={s.id} shipment={s} agent={findAgentForShipment(agents, s.id)} />
           ))}
         </div>
       </main>

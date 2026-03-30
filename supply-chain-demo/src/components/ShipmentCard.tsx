@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import type { Agent } from "../../../sdk";
 import { explorerTxUrl } from "../lib/explorer";
 import { truncateDid } from "../lib/format";
-import { patchShipmentStatus } from "../lib/shipmentsApi";
 import type { Shipment } from "../lib/shipmentsApi";
 import { AgentStatusCard } from "./AgentStatusCard";
 
@@ -35,35 +34,29 @@ function shipmentStatusBadge(status: string): { cls: string; label: string } {
 export type ShipmentCardProps = {
   shipment: Shipment;
   agent?: Agent;
-  onAfterDemoStatusChange?: () => void | Promise<void>;
 };
 
-/** Select value: completed maps to API payment_released */
-function statusToSelectValue(status: string): string {
-  if (status === "payment_released") return "completed";
-  return status;
-}
-
-export function ShipmentCard({ shipment, agent, onAfterDemoStatusChange }: ShipmentCardProps) {
-  const [demoBusy, setDemoBusy] = useState(false);
+export function ShipmentCard({ shipment, agent }: ShipmentCardProps) {
+  const navigate = useNavigate();
   const badge = shipmentStatusBadge(shipment.status);
-  const selectValue = statusToSelectValue(shipment.status);
 
-  async function handleDemoStatusChange(next: string): Promise<void> {
-    const apiStatus = next === "completed" ? "payment_released" : next;
-    setDemoBusy(true);
-    try {
-      await patchShipmentStatus(shipment.id, apiStatus, undefined, { demo: true });
-      await onAfterDemoStatusChange?.();
-    } catch {
-      /* parent polling / refresh will reconcile; optional: toast */
-    } finally {
-      setDemoBusy(false);
-    }
+  function goToShipment(): void {
+    navigate(`/shipment/${encodeURIComponent(shipment.id)}`);
   }
 
   return (
-    <div className="flex w-full flex-col rounded-2xl border border-sky-200/90 bg-white/95 p-5 text-left shadow-lg shadow-sky-100/80">
+    <div
+      className="flex w-full flex-col rounded-2xl border border-sky-200/90 bg-white/95 p-5 text-left shadow-lg shadow-sky-100/80 cursor-pointer transition hover:border-sky-300 hover:shadow-sky-200/90"
+      role="link"
+      tabIndex={0}
+      onClick={goToShipment}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          goToShipment();
+        }
+      }}
+    >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <h3 className="text-lg font-semibold text-sky-950">{shipment.product}</h3>
@@ -83,6 +76,10 @@ export function ShipmentCard({ shipment, agent, onAfterDemoStatusChange }: Shipm
           <p className="mt-1 text-sm text-sky-800/85">
             Supplier DID{" "}
             <span className="font-mono text-xs text-sky-900/90">{truncateDid(shipment.supplierDid)}</span>
+          </p>
+          <p className="mt-1 text-sm text-sky-800/85">
+            Recipient DID{" "}
+            <span className="font-mono text-xs text-sky-900/90">{truncateDid(shipment.recipientDid)}</span>
           </p>
           <p className="mt-1 text-sm text-sky-800/85">
             Supplier wallet{" "}
@@ -106,6 +103,7 @@ export function ShipmentCard({ shipment, agent, onAfterDemoStatusChange }: Shipm
             target="_blank"
             rel="noreferrer"
             className="font-medium text-sky-600 underline decoration-sky-300 hover:text-sky-800"
+            onClick={(e) => e.stopPropagation()}
           >
             View payment on explorer
           </a>
@@ -113,27 +111,10 @@ export function ShipmentCard({ shipment, agent, onAfterDemoStatusChange }: Shipm
       ) : null}
 
       {agent ? (
-        <div className="mt-4">
+        <div className="mt-4" onClick={(e) => e.stopPropagation()}>
           <AgentStatusCard agent={agent} />
         </div>
       ) : null}
-
-      <div className="mt-4 flex flex-col items-center gap-2 border-t border-sky-200/80 pt-4">
-        <label htmlFor={`demo-status-${shipment.id}`} className="text-xs font-medium text-sky-700/80">
-          Status demo
-        </label>
-        <select
-          id={`demo-status-${shipment.id}`}
-          value={selectValue}
-          disabled={demoBusy}
-          onChange={(e) => void handleDemoStatusChange(e.target.value)}
-          className="tf-demo-select w-full max-w-[11rem] rounded-lg border border-sky-200 bg-white px-3 py-2 text-center text-sm text-sky-950 shadow-inner shadow-sky-100 [text-align-last:center] outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
-        >
-          <option value="in_transit">in_transit</option>
-          <option value="delivered">delivered</option>
-          <option value="completed">completed</option>
-        </select>
-      </div>
     </div>
   );
 }

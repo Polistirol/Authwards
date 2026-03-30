@@ -62,3 +62,62 @@ export type AgentLog = {
   type: string;
   data: unknown;
 };
+
+/** Public trust-chain resolution (`GET /resolve/*`). Amounts in permit mirror on-chain nanos. */
+export interface DelegateResolution {
+  delegateDid: string;
+  delegateWallet: string;
+  ownerDid: string | null;
+  ownerWallet: string | null;
+  controller: string;
+  permit: PermitInfo | null;
+  trustChain: TrustChainVerification;
+}
+
+export interface PermitInfo {
+  permitObjectId: string;
+  maxPerTx: number;
+  maxPerDay: number;
+  spentToday: number;
+  expiresAt: number;
+  isActive: boolean;
+  createdAt: number;
+}
+
+export interface TrustChainVerification {
+  delegateControlledByOwner: boolean;
+  permitMatchesDids: boolean;
+  permitIsActive: boolean;
+  verified: boolean;
+}
+
+export interface OwnerDelegatesResolution {
+  ownerDid: string;
+  delegates: DelegateInfo[];
+}
+
+export interface DelegateInfo {
+  delegateDid: string;
+  name: string | null;
+  description: string | null;
+  delegateType: string;
+  walletAddress: string;
+  permissionProfile: string;
+  status: string;
+  permitObjectId: string | null;
+  permit: Partial<PermitInfo> | null;
+}
+
+export interface TxResolution {
+  txHash: string;
+  sender: string;
+  senderDid: string | null;
+  isDelegate: boolean;
+  ownerDid: string | null;
+  ownerWallet: string | null;
+  amount: number | null;
+  recipient: string | null;
+  timestamp: string | null;
+  permit: Partial<PermitInfo> | null;
+  trustChain: { verified: boolean };
+}
