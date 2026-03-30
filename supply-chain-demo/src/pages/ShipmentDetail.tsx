@@ -7,6 +7,7 @@ import { findAgentForShipment } from "../lib/agents";
 import { explorerTxUrl } from "../lib/explorer";
 import { truncateDid } from "../lib/format";
 import {
+  effectiveRecipientDid,
   fetchShipmentById,
   patchShipmentStatus,
   type Shipment,
@@ -164,6 +165,8 @@ export function ShipmentDetail() {
     [shipment, agent],
   );
 
+  const recipientDid = shipment ? effectiveRecipientDid(shipment, user?.did) : "";
+
   /** Full pipeline: payment released and on-chain tx recorded — required for VerifyPayment. */
   const verificationComplete =
     shipment?.status === "payment_released" && Boolean(shipment.txHash?.trim());
@@ -238,7 +241,7 @@ export function ShipmentDetail() {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-sky-700/80">Recipient DID</dt>
-                <dd className="break-all font-mono text-xs text-sky-900/90">{shipment.recipientDid}</dd>
+                <dd className="break-all font-mono text-xs text-sky-900/90">{recipientDid}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-sky-700/80">Supplier wallet</dt>
@@ -287,7 +290,7 @@ export function ShipmentDetail() {
                 <div className="mt-4">
                   <VerifyPayment
                     txHash={shipment.txHash!}
-                    expectedReceiverDid={user?.did ?? shipment.recipientDid}
+                    expectedReceiverDid={recipientDid}
                   />
                 </div>
               </section>

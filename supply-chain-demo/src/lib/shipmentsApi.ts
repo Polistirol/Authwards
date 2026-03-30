@@ -32,6 +32,16 @@ export type Shipment = {
   updatedAt: string;
 };
 
+/**
+ * When the user is logged in via Authwards, TraceFlow treats the shipment recipient as that user
+ * so payment verification matches the on-chain delegate owner (demo flow).
+ */
+export function effectiveRecipientDid(shipment: Shipment, userDid: string | undefined | null): string {
+  const u = typeof userDid === "string" ? userDid.trim() : "";
+  if (u.length > 0) return u;
+  return shipment.recipientDid;
+}
+
 export async function fetchShipments(): Promise<Shipment[]> {
   const base = trimSlash(getTraceflowApiBase());
   const res = await fetch(`${base}/shipments`);

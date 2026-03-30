@@ -32,39 +32,97 @@ export function buildAgentSnippetPayload(agent: DbAgent, platformUrl: string) {
     `authwards_${agentSlug}_${platform}.${ext}`;
   const platformEscapedInExpr = escapeForDoubleQuotes(platformUrl);
 
-  const n8nTransactBodyExpr = `={"to":"{{$json['recipient']}}","amount":{{$json['amount']}},"unit":"iota","memo":"{{$json['memo']}}"}`;
+  const n8nTransactBodyExpr = `={"to":"{{$json['to']}}","amount":{{$json['amount']}},"unit":"iota","memo":"{{$json['memo']}}"}`;
 
+  /** Matches Authward n8n export schema; attach a Manual / Schedule trigger to the first node in the UI. */
   const n8nWorkflow = {
     name: `Authward — ${agentName}`,
     pinData: {},
     nodes: [
       {
         parameters: {
-          rule: {
-            interval: [{ field: "seconds", secondsInterval: 30 }],
+          conditions: {
+            options: {
+              caseSensitive: true,
+              leftValue: "",
+              typeValidation: "strict",
+              version: 3,
+            },
+            conditions: [
+              {
+                id: "9189f7fe-4ac3-4f3e-99de-b9f50fd1230a",
+                leftValue: "={{$json[\"success\"]}}",
+                rightValue: "",
+                operator: {
+                  type: "boolean",
+                  operation: "true",
+                  singleValue: true,
+                },
+              },
+            ],
+            combinator: "and",
           },
+          options: {},
         },
-        name: "Every 30 seconds",
-        type: "n8n-nodes-base.scheduleTrigger",
-        typeVersion: 1.2,
-        position: [-592, 528],
-        id: "authward-schedule-1",
+        type: "n8n-nodes-base.if",
+        typeVersion: 2.3,
+        position: [656, 224],
+        id: "dabb3053-6b47-4e17-8d3f-54ffbc6ac3b8",
+        name: "Is Success?",
       },
       {
         parameters: {
-          method: "GET",
+          assignments: {
+            assignments: [
+              {
+                id: "authward-set-recipient",
+                name: "to",
+                value: "",
+                type: "string",
+              },
+              {
+                id: "authward-set-amount",
+                name: "amount",
+                value: 0,
+                type: "number",
+              },
+              {
+                id: "authward-set-memo",
+                name: "memo",
+                value: " ",
+                type: "string",
+              },
+            ],
+          },
+          options: {},
+        },
+        type: "n8n-nodes-base.set",
+        typeVersion: 3.4,
+        position: [320, 224],
+        id: "6d5e60cc-34b7-4dca-ae2d-44f6317690a7",
+        name: "Set Recipient Info",
+        notesInFlow: true,
+        notes: "Set To and Amount",
+      },
+      {
+        parameters: {
           url: `={{ $json.platformUrl || '${platformEscapedInExpr}' }}/bridge/status`,
           sendHeaders: true,
           headerParameters: {
-            parameters: [{ name: "Authorization", value: `Bearer ${agentToken}` }],
+            parameters: [
+              {
+                name: "Authorization",
+                value: `Bearer ${agentToken}`,
+              },
+            ],
           },
           options: {},
         },
         name: "Get Status",
         type: "n8n-nodes-base.httpRequest",
         typeVersion: 4.2,
-        position: [-400, 528],
-        id: "authward-status-1",
+        position: [-32, 224],
+        id: "07416538-c752-4c57-9b79-3f9429b470a9",
       },
       {
         parameters: {
@@ -78,43 +136,11 @@ export function buildAgentSnippetPayload(agent: DbAgent, platformUrl: string) {
           },
           options: {},
         },
-        name: "Agent active?",
+        name: "Is Active?",
         type: "n8n-nodes-base.if",
         typeVersion: 2,
-        position: [-192, 528],
-        id: "authward-if-1",
-      },
-      {
-        parameters: {
-          assignments: {
-            assignments: [
-              {
-                id: "authward-set-recipient",
-                name: "recipient",
-                value: "",
-                type: "string",
-              },
-              {
-                id: "authward-set-amount",
-                name: "amount",
-                value: 0,
-                type: "number",
-              },
-              {
-                id: "authward-set-memo",
-                name: "memo",
-                value: "",
-                type: "string",
-              },
-            ],
-          },
-          options: {},
-        },
-        type: "n8n-nodes-base.set",
-        typeVersion: 3.4,
-        position: [64, 512],
-        id: "authward-set-1",
-        name: "set info",
+        position: [112, 224],
+        id: "c8b0ebed-d2da-428f-b614-7a3872164249",
       },
       {
         parameters: {
@@ -135,22 +161,25 @@ export function buildAgentSnippetPayload(agent: DbAgent, platformUrl: string) {
         name: "TRANSACT",
         type: "n8n-nodes-base.httpRequest",
         typeVersion: 4.2,
-        position: [240, 512],
-        id: "authward-transact-1",
+        position: [512, 224],
+        id: "1841bb4a-ea48-4fe5-b780-f6a2efbcf545",
       },
     ],
     connections: {
-      "Every 30 seconds": {
-        main: [[{ node: "Get Status", type: "main", index: 0 }]],
+      "Set Recipient Info": {
+        main: [[{ node: "TRANSACT", type: "main", index: 0 }]],
+      },
+      "Is Success?": {
+        main: [[]],
       },
       "Get Status": {
-        main: [[{ node: "Agent active?", type: "main", index: 0 }]],
+        main: [[{ node: "Is Active?", type: "main", index: 0 }]],
       },
-      "Agent active?": {
-        main: [[{ node: "set info", type: "main", index: 0 }], []],
+      "Is Active?": {
+        main: [[{ node: "Set Recipient Info", type: "main", index: 0 }], []],
       },
-      "set info": {
-        main: [[{ node: "TRANSACT", type: "main", index: 0 }]],
+      TRANSACT: {
+        main: [[{ node: "Is Success?", type: "main", index: 0 }]],
       },
     },
     active: false,
@@ -396,7 +425,7 @@ main();`;
       n8n: {
         label: "n8n Workflow",
         description:
-          "Import from … → Import from File. Flow: Get Status → Agent active? → set info (recipient, amount, memo) → TRANSACT. IOTA accepts only positive amounts — defaults are empty / 0.",
+          "Import from … → Import from File. Flow: Get Status → Is Active? → Set Recipient Info (to, amount, memo) → TRANSACT → Is Success?. Add a Manual or Schedule trigger to Get Status. Authorization headers use this delegate’s token from the dashboard.",
         fileType: "json",
         fileName: snippetFile("n8n", "json"),
         content: n8nWorkflow,

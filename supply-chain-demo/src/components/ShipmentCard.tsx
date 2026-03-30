@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 
 import type { Agent } from "../../../sdk";
+import { useAuthwards } from "../../../sdk";
 import { explorerTxUrl } from "../lib/explorer";
 import { truncateDid } from "../lib/format";
-import type { Shipment } from "../lib/shipmentsApi";
+import { effectiveRecipientDid, type Shipment } from "../lib/shipmentsApi";
 import { AgentStatusCard } from "./AgentStatusCard";
 
 function shipmentStatusBadge(status: string): { cls: string; label: string } {
@@ -38,6 +39,8 @@ export type ShipmentCardProps = {
 
 export function ShipmentCard({ shipment, agent }: ShipmentCardProps) {
   const navigate = useNavigate();
+  const { user } = useAuthwards();
+  const recipientDid = effectiveRecipientDid(shipment, user?.did);
   const badge = shipmentStatusBadge(shipment.status);
 
   function goToShipment(): void {
@@ -79,7 +82,7 @@ export function ShipmentCard({ shipment, agent }: ShipmentCardProps) {
           </p>
           <p className="mt-1 text-sm text-sky-800/85">
             Recipient DID{" "}
-            <span className="font-mono text-xs text-sky-900/90">{truncateDid(shipment.recipientDid)}</span>
+            <span className="font-mono text-xs text-sky-900/90">{truncateDid(recipientDid)}</span>
           </p>
           <p className="mt-1 text-sm text-sky-800/85">
             Supplier wallet{" "}
