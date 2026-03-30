@@ -72,25 +72,52 @@ export function selectGasPayment(coins: CoinStruct[]): { objectId: string; versi
   return [gasPaymentRefsFromCoin(sorted[0])];
 }
 
-/** Pick one IOTA coin owned by `owner` with balance >= `minNanos` (prefer largest). */
-export async function pickCoinObjectIdForPayment(
+async function fetchAllIotaCoins(client: IotaClient, owner: string): Promise<CoinStruct[]> {
+  const out: CoinStruct[] = [];
+  let cursor: string | null | undefined = undefined;
+  for (;;) {
+    const page = await client.getCoins({ owner, limit: 50, cursor: cursor ?? undefined });
+    out.push(...page.data);
+    if (!page.hasNextPage || page.nextCursor == null) break;
+    cursor = page.nextCursor;
+  }
+  return out;
+}
+
+/**
+ * Append transfer of `amountNanos` IOTA from `owner` to `recipient`.
+ * Merges coin objects when the total balance is split across several coins (same situation as
+ * `getBalance` showing one total but no single coin covers the amount).
+ */
+export async function appendTransferFromOwnerIotaCoins(
+  tx: Transaction,
   client: IotaClient,
   owner: string,
-  minNanos: bigint,
-): Promise<string> {
-  const { data } = await client.getCoins({ owner, limit: 50 });
-  const sorted = [...data].sort((a, b) => {
+  amountNanos: bigint,
+  recipient: string,
+): Promise<void> {
+  const coins = await fetchAllIotaCoins(client, owner);
+  if (!coins.length) {
+    throw new Error(`No IOTA coins for owner ${owner}`);
+  }
+  const sorted = [...coins].sort((a, b) => {
     const ba = BigInt(a.balance);
     const bb = BigInt(b.balance);
     if (bb > ba) return 1;
     if (bb < ba) return -1;
     return 0;
   });
-  const ok = sorted.find((c) => BigInt(c.balance) >= minNanos);
-  if (!ok) {
-    throw new Error(`No coin with balance >= ${minNanos} nanos for owner ${owner}`);
+  let cumulative = BigInt(sorted[0].balance);
+  const primary = tx.object(sorted[0].coinObjectId);
+  for (let i = 1; i < sorted.length && cumulative < amountNanos; i++) {
+    tx.mergeCoins(primary, [tx.object(sorted[i].coinObjectId)]);
+    cumulative += BigInt(sorted[i].balance);
   }
-  return ok.coinObjectId;
+  if (cumulative < amountNanos) {
+    throw new Error(`Insufficient IOTA balance: need ${amountNanos} nanos, have ${cumulative} nanos for owner ${owner}`);
+  }
+  const [coin] = tx.splitCoins(primary, [amountNanos]);
+  tx.transferObjects([coin], recipient);
 }
 
 /**

@@ -289,6 +289,42 @@ router.get("/list", requireJwt, async (req, res) => {
   }
 });
 
+/**
+ * Removes the delegate from the platform database and dashboard only.
+ * Allowed only when status is `revoked`. DID and wallet objects remain on chain.
+ */
+router.delete("/:agentDid", requireJwt, async (req, res) => {
+  try {
+    const jwtUser = req.user as JwtUserPayload;
+    const agentDid = decodeURIComponent(req.params.agentDid);
+    const a = await db.findAgentByDid(agentDid);
+    if (
+      !a ||
+      a.ownerProviderId !== jwtUser.providerId ||
+      a.ownerProviderType !== jwtUser.providerType
+    ) {
+      res.status(403).json({ error: "Agent not found or not authorized" });
+      return;
+    }
+    if (effectiveStatus(a) !== "revoked") {
+      res.status(400).json({
+        error: "not_revoked",
+        message: "Only revoked delegates can be removed from the dashboard.",
+      });
+      return;
+    }
+    const removed = await db.deleteAgentByDid(agentDid);
+    if (!removed) {
+      res.status(404).json({ error: "Agent not found" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Delete error";
+    res.status(500).json({ error: msg });
+  }
+});
+
 router.post("/:agentDid/activate", requireJwt, async (req, res) => {
   try {
     const jwtUser = req.user as JwtUserPayload;

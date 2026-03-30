@@ -1,21 +1,26 @@
 {
   "name": "@authwards/sdk",
-  "version": "0.0.1",
+  "version": "1.0.0-beta.1",
+  "description": "React SDK for social login, decentralized identity and delegated identities on IOTA",
   "private": true,
   "type": "module",
-  "main": "./index.ts",
+  "main": "index.ts",
   "types": "./index.ts",
   "exports": {
     ".": "./index.ts"
   },
+  "keywords": ["iota", "did", "identity", "web3", "auth", "sdk"],
+  "license": "MIT",
+  "author": "Authward",
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
   "dependencies": {
     "@iota/wallet-standard": "^0.4.0",
     "@wallet-standard/app": "^1.1.0",
-    "@wallet-standard/features": "^1.1.0"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
+    "@wallet-standard/features": "^1.1.0",
+    "qrcode.react": "^4.2.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

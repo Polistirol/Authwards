@@ -2,38 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
-import { useAgent, useAuthwards } from "../sdk";
+import { ConnectButton, useAgent, useAuthwards } from "../sdk";
 import type { Agent, AgentStatus, CreateAgentResult, User } from "../sdk";
 import AgentCard from "../components/AgentCard";
 import FundAgentModal from "../components/FundAgentModal";
+import WalletSection from "../components/WalletSection";
 import { IconArrowTopRightOnSquare, IconCheck, IconClipboard } from "../components/icons";
+import { explorerAddressUrl, explorerDidObjectUrl } from "../lib/explorer";
 import SnippetModal from "../components/SnippetModal";
 import TrustChain from "../components/TrustChain";
 
-function explorerAddressUrl(address: string, userDid: string): string {
-  const base = `https://explorer.iota.org/address/${encodeURIComponent(address)}`;
-  const m = userDid.match(/did:iota:([^:]+):/);
-  const net = m?.[1];
-  if (net && net !== "mainnet") {
-    return `${base}?network=${encodeURIComponent(net)}`;
-  }
-  return base;
-}
+/** Set to `true` to show the Trust Chain section (schema) below the delegate list. */
+const SHOW_TRUST_CHAIN_SECTION = false;
 
-/** DID document on-chain: last segment `0x...` → `/object/0x...` (+ network from DID). */
-function explorerDidObjectUrl(did: string): string | null {
-  const trimmed = did.trim();
-  const parts = trimmed.split(":");
-  const last = parts[parts.length - 1] ?? "";
-  if (!last.startsWith("0x") || last.length < 3) return null;
-  const base = `https://explorer.iota.org/object/${encodeURIComponent(last)}`;
-  const m = trimmed.match(/did:iota:([^:]+):/);
-  const net = m?.[1];
-  if (net && net !== "mainnet") {
-    return `${base}?network=${encodeURIComponent(net)}`;
-  }
-  return base;
-}
+/** Wallet activity is hidden for logged-in dashboard (set `true` to show the on-chain tx list again). */
+const SHOW_WALLET_ACTIVITY_SECTION = false;
 
 function highlightJsonText(text: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -143,11 +126,21 @@ const PROFILES = [
   },
 ];
 
+/** Value for `datetime-local` (local wall time, same encoding as `defaultExpiresLocal`). */
+function toDatetimeLocalValue(d: Date): string {
+  const x = new Date(d);
+  x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
+  return x.toISOString().slice(0, 16);
+}
+
 function defaultExpiresLocal(): string {
   const d = new Date();
   d.setDate(d.getDate() + 30);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
+  return toDatetimeLocalValue(d);
+}
+
+function nowExpiresLocal(): string {
+  return toDatetimeLocalValue(new Date());
 }
 
 function formatIotaFromNanos(nanos: string | undefined): string {
@@ -162,7 +155,7 @@ function formatIotaFromNanos(nanos: string | undefined): string {
 }
 
 export default function Dashboard() {
-  const { user, did, isAuthenticated, loading, logout, backendUrl, token } =
+  const { user, did, isAuthenticated, loading, backendUrl, token } =
     useAuthwards();
   const {
     agents,
@@ -171,6 +164,7 @@ export default function Dashboard() {
     agentLogs,
     fetchAgentLogs,
     revokeAgent,
+    deleteAgent,
     refreshAgents,
     activateAgent,
   } = useAgent();
@@ -197,7 +191,26 @@ export default function Dashboard() {
   const [snippetAgentDid, setSnippetAgentDid] = useState<string | null>(null);
   const [snippetStatus, setSnippetStatus] = useState<AgentStatus>("created");
 
-  const [fundAddress, setFundAddress] = useState<string | null>(null);
+  const [fundModal, setFundModal] = useState<{
+    agentDid: string;
+    walletAddress: string;
+  } | null>(null);
+
+  /** Increments to trigger delegate wallet balance refetch on cards (no polling). */
+  const [agentBalanceEpoch, setAgentBalanceEpoch] = useState(0);
+  const bumpAgentBalances = useCallback(() => {
+    setAgentBalanceEpoch((n) => n + 1);
+  }, []);
+  /** Increments to refetch account wallet balance (identity section) without waiting for the 15s poll. */
+  const [userBalanceEpoch, setUserBalanceEpoch] = useState(0);
+  const bumpUserBalance = useCallback(() => {
+    setUserBalanceEpoch((n) => n + 1);
+  }, []);
+  const refreshAgentsAndBalances = useCallback(() => {
+    void refreshAgents();
+    bumpAgentBalances();
+    bumpUserBalance();
+  }, [refreshAgents, bumpAgentBalances, bumpUserBalance]);
 
   const prevStatusRef = useRef<Map<string, AgentStatus>>(new Map());
   const [toast, setToast] = useState<string | null>(null);
@@ -272,7 +285,7 @@ export default function Dashboard() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [user?.walletAddress, trimBackend]);
+  }, [user?.walletAddress, trimBackend, userBalanceEpoch]);
 
   const openSnippetFor = useCallback((agent: Agent) => {
     setSnippetAgentDid(agent.agentDid);
@@ -367,24 +380,10 @@ export default function Dashboard() {
 
       <header className="border-b border-white/10 px-6 py-4">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img
-              src={user.picture ?? undefined}
-              alt=""
-              className="h-11 w-11 rounded-full border border-white/10"
-            />
-            <div>
-              <p className="font-semibold text-white">{user.name}</p>
-              <p className="text-sm text-slate-500">{user.email ?? "—"}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
-          >
-            Sign out
-          </button>
+          <span className="text-sm font-semibold tracking-wide text-aw-accent">
+            Authwards
+          </span>
+          <ConnectButton theme="dark" hideDashboardLink />
         </div>
       </header>
 
@@ -474,6 +473,8 @@ export default function Dashboard() {
           </div>
         </section>
 
+        {SHOW_WALLET_ACTIVITY_SECTION ? <WalletSection /> : null}
+
         <section>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -516,11 +517,25 @@ export default function Dashboard() {
                   key={agent.agentDid}
                   agent={agent}
                   backendUrl={backendUrl}
+                  agentBalanceEpoch={agentBalanceEpoch}
+                  token={token}
+                  onRefreshAgent={refreshAgentsAndBalances}
                   logs={agentLogs.get(agent.agentDid) ?? []}
                   fetchAgentLogs={fetchAgentLogs}
                   onOpenSnippet={() => openSnippetFor(agent)}
-                  onOpenFund={() => setFundAddress(agent.walletAddress ?? null)}
+                  onOpenFund={() =>
+                    agent.walletAddress
+                      ? (() => {
+                          bumpAgentBalances();
+                          setFundModal({
+                            agentDid: agent.agentDid,
+                            walletAddress: agent.walletAddress,
+                          });
+                        })()
+                      : undefined
+                  }
                   onRevoke={() => revokeAgent(agent.agentDid)}
+                  onDeleteAgent={(did) => deleteAgent(did)}
                   onActivate={activateAgent}
                 />
               ))}
@@ -528,7 +543,9 @@ export default function Dashboard() {
           )}
         </section>
 
-        <TrustChain userName={user.name} userDid={did} agents={agents} />
+        {SHOW_TRUST_CHAIN_SECTION ? (
+          <TrustChain userName={user.name} userDid={did} agents={agents} />
+        ) : null}
       </main>
 
       {createOpen ? (
@@ -673,7 +690,13 @@ export default function Dashboard() {
                       type="checkbox"
                       className="accent-aw-accent"
                       checked={noPermitExpiry}
-                      onChange={(e) => setNoPermitExpiry(e.target.checked)}
+                      onChange={(e) => {
+                        const noExpiry = e.target.checked;
+                        setNoPermitExpiry(noExpiry);
+                        if (!noExpiry) {
+                          setExpiresAtLocal(nowExpiresLocal());
+                        }
+                      }}
                     />
                     <span className="text-sm text-slate-300">
                       No on-chain permit expiry
@@ -787,15 +810,19 @@ export default function Dashboard() {
         />
       ) : null}
 
-      {fundAddress ? (
+      {fundModal ? (
         <FundAgentModal
           open
-          onClose={() => setFundAddress(null)}
-          toAddress={fundAddress}
+          onClose={() => {
+            refreshAgentsAndBalances();
+            setFundModal(null);
+          }}
+          agentDid={fundModal.agentDid}
+          toAddress={fundModal.walletAddress}
           backendUrl={backendUrl}
           token={token}
           onSuccess={() => {
-            void refreshAgents();
+            refreshAgentsAndBalances();
           }}
         />
       ) : null}

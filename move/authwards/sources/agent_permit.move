@@ -8,10 +8,9 @@
 // DEPLOY: compilare e deployare su IOTA mainnet.
 // Il package address dopo il deploy va salvato nel .env come PERMIT_PACKAGE_ID.
 
-module iota_auth::agent_permit {
+module authwards::agent_permit {
     
-    use iota::object;
-    use iota::transfer;
+    //use iota;
     //use iota::tx_context;
     use iota::clock::{Self, Clock};
     use iota::event;

@@ -333,25 +333,12 @@ Example:
 
 Typical Zap: Trigger → GET status → (optional filter if status is active) → POST transact.`;
 
-  const curlContent = `#!/bin/bash
-# Authward Agent — ${agentName}
-# DID: ${agentDid}
-# PLATFORM_URL matches the server BACKEND_URL used when this snippet was generated.
-
-PLATFORM_URL="${platformUrl}"
-AGENT_TOKEN="${agentToken}"
-# IOTA accepts only positive values as amount. Set RECIPIENT and amount > 0 before sending.
-RECIPIENT=""
-
-# GET /bridge/status
-curl -s -X GET "$PLATFORM_URL/bridge/status" \\
-  -H "Authorization: Bearer $AGENT_TOKEN" | jq .
-
-# POST /bridge/transact (unit iota = human IOTA amounts, not raw nanos)
-curl -s -X POST "$PLATFORM_URL/bridge/transact" \\
-  -H "Authorization: Bearer $AGENT_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d "{\\"to\\":\\"$RECIPIENT\\",\\"amount\\":0,\\"unit\\":\\"iota\\",\\"memo\\":\\"\\"}" | jq .`;
+  const baseUrl = platformUrl.replace(/\/+$/, "");
+  const statusUrl = `${baseUrl}/bridge/status`;
+  const transactUrl = `${baseUrl}/bridge/transact`;
+  const curlStatusLine = `curl -s -X GET "${escapeForDoubleQuotes(statusUrl)}" -H "Authorization: Bearer ${escapeForDoubleQuotes(agentToken)}"`;
+  const curlTransactLine = `curl -s -X POST "${escapeForDoubleQuotes(transactUrl)}" -H "Authorization: Bearer ${escapeForDoubleQuotes(agentToken)}" -H "Content-Type: application/json" -d '{"to":"","amount":0,"unit":"iota","memo":""}'`;
+  const curlContent = `${curlStatusLine}\n\n${curlTransactLine}`;
 
   const jsContent = `#!/usr/bin/env node
 /**
@@ -436,11 +423,16 @@ main();`;
         content: zapierContent,
       },
       curl: {
-        label: "cURL (generic)",
-        description: "GET /bridge/status and POST /bridge/transact examples",
-        fileType: "sh",
-        fileName: snippetFile("curl", "sh"),
+        label: "cURL",
+        description: "",
+        fileType: "txt",
+        fileName: snippetFile("curl", "txt"),
+        copyOnly: true,
         content: curlContent,
+        curlDetail: {
+          status: curlStatusLine,
+          transact: curlTransactLine,
+        },
       },
       javascript: {
         label: "JavaScript / Node.js",

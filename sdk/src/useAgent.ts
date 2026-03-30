@@ -48,6 +48,8 @@ export type UseAgentResult = {
   revokeAgent: (agentDid: string) => Promise<boolean>;
   /** Activates the agent from the dashboard (POST /agent/:agentDid/activate). */
   activateAgent: (agentDid: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Removes a revoked delegate from the dashboard DB only (DELETE /agent/:agentDid). */
+  deleteAgent: (agentDid: string) => Promise<boolean>;
 };
 
 export function useAgent(): UseAgentResult {
@@ -106,14 +108,6 @@ export function useAgent(): UseAgentResult {
   useEffect(() => {
     void loadAgents(false);
   }, [loadAgents]);
-
-  useEffect(() => {
-    if (!token) return;
-    const id = setInterval(() => {
-      void loadAgents(true);
-    }, 15_000);
-    return () => clearInterval(id);
-  }, [token, loadAgents]);
 
   const setLogsReplace = useCallback((agentDid: string, logs: AgentLog[]): void => {
     setAgentLogs((prev: Map<string, AgentLog[]>) => {
@@ -247,6 +241,33 @@ export function useAgent(): UseAgentResult {
     [backendUrl, token, authHeaders, loadAgents],
   );
 
+  const deleteAgent = useCallback(
+    async (agentDid: string): Promise<boolean> => {
+      if (!token) return false;
+      try {
+        const res = await fetch(
+          `${trimTrailingSlash(backendUrl)}/agent/${encodeURIComponent(agentDid)}`,
+          { method: "DELETE", headers: authHeaders() },
+        );
+        if (!res.ok) {
+          console.error("[@authwards/sdk] DELETE /agent/:agentDid failed:", res.status, await res.text());
+          return false;
+        }
+        await loadAgents(true);
+        setAgentLogs((prev) => {
+          const next = new Map(prev);
+          next.delete(agentDid);
+          return next;
+        });
+        return true;
+      } catch (e) {
+        console.error("[@authwards/sdk] DELETE /agent/:agentDid error:", e);
+        return false;
+      }
+    },
+    [backendUrl, token, authHeaders, loadAgents],
+  );
+
   return {
     agents,
     loading,
@@ -256,5 +277,6 @@ export function useAgent(): UseAgentResult {
     fetchAgentLogs,
     revokeAgent,
     activateAgent,
+    deleteAgent,
   };
 }

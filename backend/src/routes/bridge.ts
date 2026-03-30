@@ -16,7 +16,7 @@ import {
   getPermitInfo,
   revokePermitOnChain,
 } from "../services/permitContract.js";
-import { pickCoinObjectIdForPayment, sponsoredExecute } from "../services/sponsoredTx.js";
+import { appendTransferFromOwnerIotaCoins, sponsoredExecute } from "../services/sponsoredTx.js";
 import type { AgentStatus, DbAgent } from "../types/db.js";
 
 const router = Router();
@@ -248,10 +248,8 @@ router.post("/execute", requireAgentToken, async (req, res) => {
     const from = keypair.getPublicKey().toIotaAddress();
 
     const client = new IotaClient({ url: getNodeUrl() });
-    const coinId = await pickCoinObjectIdForPayment(client, from, amountNanos);
     const tx = new Transaction();
-    const [coin] = tx.splitCoins(tx.object(coinId), [amountNanos]);
-    tx.transferObjects([coin], recipient);
+    await appendTransferFromOwnerIotaCoins(tx, client, from, amountNanos, recipient);
 
     const result = await sponsoredExecute(tx, keypair, client, { gasBudget: SPONSORED_TX_GAS_BUDGET });
 
@@ -432,10 +430,8 @@ router.post("/transact", requireAgentToken, async (req, res) => {
       return;
     }
 
-    const coinId = await pickCoinObjectIdForPayment(client, from, amountNanos);
     const tx = new Transaction();
-    const [coin] = tx.splitCoins(tx.object(coinId), [amountNanos]);
-    tx.transferObjects([coin], to);
+    await appendTransferFromOwnerIotaCoins(tx, client, from, amountNanos, to);
 
     const result = await sponsoredExecute(tx, keypair, client, { gasBudget: SPONSORED_TX_GAS_BUDGET });
 

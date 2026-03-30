@@ -35,8 +35,9 @@ export default function Home() {
             Authwards
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
-            Your Google identity becomes an IOTA DID. Create delegate identities with
-            verifiable on-chain permissions.
+            Sign in with Google, GitHub, or Telegram. OAuth turns your account into an IOTA DID.
+            <br />
+            Create delegate identities with verifiable on-chain permissions.
           </p>
           <button
             type="button"
@@ -49,32 +50,52 @@ export default function Home() {
 
         <section className="mt-24 grid gap-6 md:grid-cols-3">
           <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-left shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-              <GoogleGlyph />
+            <div className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white/5 px-3">
+              <GoogleGlyph className="h-7 w-7 shrink-0" />
+              <GitHubGlyph className="h-7 w-7 shrink-0" />
+              <TelegramGlyph className="h-7 w-7 shrink-0" />
             </div>
-            <h2 className="text-lg font-semibold text-white">Sign in with Google</h2>
+            <h2 className="text-lg font-semibold text-white">Social OAuth</h2>
             <p className="mt-2 text-sm leading-relaxed text-slate-400">
-              Secure OAuth authentication; no seed to manage on the device.
+              Use Google, GitHub, or Telegram.
+              <br />
+              Quick sign-in, no seed phrase on this device.
+              <br />
+              No wallet required.
             </p>
           </article>
 
-          <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-left shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-              <FingerprintIcon />
+          <article className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-left shadow-lg">
+            <div className="mb-4 flex h-12 w-full items-center justify-center rounded-xl bg-white/5">
+              <CodeBracketIcon />
             </div>
-            <h2 className="text-lg font-semibold text-white">DID on IOTA</h2>
+            <h2 className="text-lg font-semibold text-white">
+              Integrate Authward in your dApp
+            </h2>
             <p className="mt-2 text-sm leading-relaxed text-slate-400">
-              Self-sovereign identity on the Tangle: public, verifiable DID document.
+              Social login, DID, and delegated identities.
+              <br />
+              In five lines of code.
             </p>
+            <a
+              href="/authward-sdk-v1_beta.zip"
+              download
+              className="mt-5 self-center inline-flex items-center justify-center rounded-xl border border-aw-accent/45 bg-transparent px-5 py-2.5 text-sm font-semibold text-aw-accent transition hover:border-aw-accent hover:text-aw-accent-hover"
+            >
+              Download SDK v1 beta
+            </a>
           </article>
 
           <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-left shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
+            <div className="mb-4 flex h-12 w-full items-center justify-center rounded-xl bg-white/5">
               <BotIcon />
             </div>
-            <h2 className="text-lg font-semibold text-white">Delegates</h2>
+            <h2 className="text-lg font-semibold text-white">
+              Delegate, don&apos;t share keys
+            </h2>
             <p className="mt-2 text-sm leading-relaxed text-slate-400">
-              Create delegates with permission profiles and track every action on-chain.
+              Create identities for agents, teammates, or devices. Permissions enforced
+              on-chain, revocable anytime.
             </p>
           </article>
         </section>
@@ -83,9 +104,9 @@ export default function Home() {
   );
 }
 
-function GoogleGlyph() {
+function GoogleGlyph({ className = "h-7 w-7" }: { className?: string }) {
   return (
-    <svg width="28" height="28" viewBox="0 0 48 48" aria-hidden>
+    <svg className={className} viewBox="0 0 48 48" aria-hidden>
       <path
         fill="#EA4335"
         d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
@@ -106,7 +127,31 @@ function GoogleGlyph() {
   );
 }
 
-function FingerprintIcon() {
+function GitHubGlyph({ className = "h-7 w-7" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="currentColor"
+        className="text-white"
+        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+      />
+    </svg>
+  );
+}
+
+function TelegramGlyph({ className = "h-7 w-7" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="12" fill="#229ED9" />
+      <path
+        fill="white"
+        d="M17.472 7.361l-2.15 10.14c-.162.72-.58.896-1.174.558l-3.24-2.386-1.563 1.505c-.173.173-.318.318-.653.318l.233-3.31 5.98-5.4c.26-.232-.057-.36-.403-.13l-7.39 4.66-3.18-1c-.693-.216-.706-.693.145-.998l12.4-4.78c.577-.216 1.08.13.894.998z"
+      />
+    </svg>
+  );
+}
+
+function CodeBracketIcon() {
   return (
     <svg
       className="h-7 w-7 text-aw-accent"
@@ -119,7 +164,7 @@ function FingerprintIcon() {
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.87 5.64-2.37 7.91m-4.66-12.12A7.5 7.5 0 004.5 10.5c0 2.92.87 5.64 2.37 7.91M9 10.5h.008v.008H9V10.5zm3 0h.008v.008H12V10.5zm3 0h.008v.008H15V10.5z"
+        d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25"
       />
     </svg>
   );

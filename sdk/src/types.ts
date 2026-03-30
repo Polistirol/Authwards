@@ -52,6 +52,8 @@ export type Agent = {
   taskType?: string;
   taskConfig?: AgentTaskConfig;
   permitObjectId?: string | null;
+  /** Explorer URL for the on-chain permit object (when returned by the API). */
+  permitExplorerUrl?: string | null;
 };
 
 export type AgentLog = {

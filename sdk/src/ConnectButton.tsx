@@ -10,15 +10,42 @@ import {
   type ReactElement,
 } from "react";
 import { createPortal } from "react-dom";
+import { QRCodeSVG } from "qrcode.react";
 
 import { useAuthwards } from "./useAuthwards";
 import { useWallet } from "./useWallet";
 import type { AuthProviderType, User } from "./types";
-import { AUTHWARDS_UI, AUTHWARDS_UI_RGBA } from "./theme";
+import { AUTHWARDS_UI } from "./theme";
 const DROPDOWN_MIN_WIDTH = 300;
 const DROPDOWN_Z = 9999;
-/** Explorer IOTA (path `/address/`, `/object/`). */
+const MODAL_Z = 10050;
+/** Explorer IOTA (path `/address/`, `/object/`, `/txblock/`). */
 const IOTA_EXPLORER_ORIGIN = "https://explorer.iota.org";
+
+function trimBackendUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+function explorerTxUrl(txHash: string, userDid: string): string {
+  const base = `${IOTA_EXPLORER_ORIGIN}/txblock/${encodeURIComponent(txHash)}`;
+  const m = userDid.match(/did:iota:([^:]+):/);
+  const net = m?.[1];
+  if (net && net !== "mainnet") {
+    return `${base}?network=${encodeURIComponent(net)}`;
+  }
+  return base;
+}
+
+function truncateAddrPreview(addr: string, head = 8, tail = 6): string {
+  if (addr.length <= head + tail + 1) return addr;
+  return `${addr.slice(0, head)}…${addr.slice(-tail)}`;
+}
+
+function formatIotaPreview(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  const abs = Math.abs(n);
+  return abs >= 1 ? n.toFixed(2) : n.toFixed(6);
+}
 
 export type ConnectButtonProps = {
   label?: string;
@@ -37,16 +64,49 @@ export type ConnectButtonProps = {
   onDisconnect?: () => void;
   /** “Powered by Authwards” link in the menu footer. */
   landingUrl?: string;
+  /** When `true`, hides “Manage delegated identities” (e.g. on the dashboard). */
+  hideDashboardLink?: boolean;
 };
 
-function truncateDidShort(did: string): string {
-  if (did.length <= 10) return did;
-  return `${did.slice(0, 6)}…${did.slice(-4)}`;
+/** Menu / button label: first 15 chars … last 4 (e.g. `did:iota:smr:0x…`). */
+function truncateDidMenu(did: string): string {
+  if (did.length <= 20) return did;
+  return `${did.slice(0, 23)}…${did.slice(-6)}`;
+}
+
+/** ~30% smaller than 16px / 28px controls in the account menu. */
+const MENU_ICON_PX = Math.round(16 * 0.7);
+const MENU_ICON_BTN_PX = Math.round(28 * 0.7);
+/** Space for two icon buttons + gaps (icons sit flush after text). */
+const MENU_ICON_GROUP_RESERVE_PX = MENU_ICON_BTN_PX * 2 + 8;
+
+function IconClipboard({ color, size = MENU_ICON_PX }: { color: string; size?: number }): ReactElement {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+      />
+    </svg>
+  );
+}
+
+function IconExternalLink({ color, size = MENU_ICON_PX }: { color: string; size?: number }): ReactElement {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5M19.5 3h-6m6 0v6m0-6L10.5 14.25"
+      />
+    </svg>
+  );
 }
 
 function truncateAddress(addr: string): string {
   if (addr.length <= 14) return addr;
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  return `${addr.slice(0, 7)}…${addr.slice(-6)}`;
 }
 
 function initialsFromName(name: string): string {
@@ -68,8 +128,13 @@ function formatIotaFromNanos(nanosStr: string | null): string {
   }
 }
 
-function explorerWalletUrl(address: string): string {
-  return `${IOTA_EXPLORER_ORIGIN}/address/${encodeURIComponent(address)}`;
+const NANOS_PER_IOTA_NUM = 1_000_000_000;
+
+/** Parse user IOTA string to nanos; `null` if invalid or non-positive. */
+function parseSendAmountNanos(amountStr: string): bigint | null {
+  const n = parseFloat(amountStr.replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return BigInt(Math.round(n * NANOS_PER_IOTA_NUM));
 }
 
 /** Extracts the `0x…` object id from the DID (without `did:iota:…`). */
@@ -169,6 +234,7 @@ export function ConnectButton({
   onConnect,
   onDisconnect,
   landingUrl,
+  hideDashboardLink = false,
 }: ConnectButtonProps): ReactElement {
   const {
     user,
@@ -179,6 +245,7 @@ export function ConnectButton({
     login,
     logout,
     token,
+    backendUrl,
   } = useAuthwards();
   const { loading: balanceLoading, balance, getBalance } = useWallet();
 
@@ -187,6 +254,17 @@ export function ConnectButton({
   const [menuVisible, setMenuVisible] = useState(false);
   const [copyDidFeedback, setCopyDidFeedback] = useState(false);
   const [copyAddrFeedback, setCopyAddrFeedback] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [sendTo, setSendTo] = useState("");
+  const [sendAmountStr, setSendAmountStr] = useState("");
+  const [sendBusy, setSendBusy] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccessInfo, setSendSuccessInfo] = useState<{
+    txHash: string;
+    amountIota: number;
+    to: string;
+  } | null>(null);
 
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -243,6 +321,8 @@ export function ConnectButton({
   useEffect(() => {
     if (!isAuthenticated || !walletAddress) return;
     void getBalance(walletAddress);
+    const id = window.setInterval(() => void getBalance(walletAddress), 30_000);
+    return () => clearInterval(id);
   }, [isAuthenticated, walletAddress, getBalance]);
 
   const updatePanelPos = useCallback(() => {
@@ -286,13 +366,24 @@ export function ConnectButton({
   }, [menuOpen, updatePanelPos]);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!isAuthenticated) {
+      setSendOpen(false);
+      setReceiveOpen(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!menuOpen && !sendOpen && !receiveOpen) return;
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setSendOpen(false);
+        setReceiveOpen(false);
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [menuOpen]);
+  }, [menuOpen, sendOpen, receiveOpen]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -338,14 +429,95 @@ export function ConnectButton({
   };
 
   const openExplorerDidObject = (): void => {
-    if (!didObjectHex) return;
-    window.open(explorerDidObjectUrl(didObjectHex), "_blank", "noopener,noreferrer");
+    if (didObjectHex) {
+      window.open(explorerDidObjectUrl(didObjectHex), "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (did?.trim()) {
+      const fallback = `https://explorer.iota.org/testnet/did/${encodeURIComponent(did.trim())}`;
+      window.open(fallback, "_blank", "noopener,noreferrer");
+    }
   };
 
-  const openExplorerAddr = (): void => {
+  const openExplorerWalletAddr = (): void => {
     if (!walletAddress) return;
-    window.open(explorerWalletUrl(walletAddress), "_blank", "noopener,noreferrer");
+    window.open(
+      `${IOTA_EXPLORER_ORIGIN}/address/${encodeURIComponent(walletAddress)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
+
+  const submitSend = useCallback(async (): Promise<void> => {
+    setSendError(null);
+    setSendSuccessInfo(null);
+    const to = sendTo.trim();
+    const n = parseFloat(sendAmountStr.replace(",", "."));
+    if (!to) {
+      setSendError("Enter a recipient address.");
+      return;
+    }
+    if (!Number.isFinite(n) || n <= 0) {
+      setSendError("Enter a valid IOTA amount.");
+      return;
+    }
+    const amountNanos = parseSendAmountNanos(sendAmountStr);
+    if (!amountNanos) {
+      setSendError("Enter a valid IOTA amount.");
+      return;
+    }
+    if (!token) {
+      setSendError("Not authenticated.");
+      return;
+    }
+    if (!walletAddress) return;
+    setSendBusy(true);
+    try {
+      const walletData = await getBalance(walletAddress);
+      const raw = walletData.balanceNanos ?? walletData.balance;
+      let maxNanos = 0n;
+      if (raw !== undefined && raw !== null) {
+        try {
+          maxNanos = BigInt(String(raw));
+        } catch {
+          maxNanos = 0n;
+        }
+      }
+      if (amountNanos > maxNanos) {
+        setSendError("Amount exceeds your available balance.");
+        return;
+      }
+      const res = await fetch(`${trimBackendUrl(backendUrl)}/wallet/transfer`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ to, amount: n, unit: "iota" }),
+      });
+      const json: unknown = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          typeof json === "object" && json && "error" in json
+            ? String((json as { error: unknown }).error)
+            : res.statusText;
+        setSendError(msg);
+        return;
+      }
+      const txHash =
+        typeof json === "object" && json && "txHash" in json
+          ? String((json as { txHash: unknown }).txHash)
+          : "";
+      setSendSuccessInfo({ txHash, amountIota: n, to });
+      setSendTo("");
+      setSendAmountStr("");
+      void getBalance(walletAddress);
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setSendBusy(false);
+    }
+  }, [backendUrl, token, walletAddress, sendTo, sendAmountStr, getBalance]);
 
   const toggleMenu = (e: MouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
@@ -415,8 +587,36 @@ export function ConnectButton({
     );
   }
 
-  const displayDid = did ? truncateDidShort(did) : "—";
   const displayName = user?.name?.trim() || "User";
+  const nameTrim = user?.name?.trim() ?? "";
+  /** OAuth / Telegram: show name; wallet login or empty name: show truncated `0x…` address. */
+  const useNameOnConnectButton =
+    user?.providerType !== "wallet" && nameTrim.length > 0;
+  const connectedButtonLabel = useNameOnConnectButton
+    ? nameTrim
+    : walletAddress
+      ? truncateAddress(walletAddress)
+      : "—";
+  const previewSendAmount = parseFloat(sendAmountStr.replace(",", "."));
+  const previewSendOk = Number.isFinite(previewSendAmount) && previewSendAmount > 0;
+  const previewSendTo = sendTo.trim();
+
+  const sendAmountNanosParsed = useMemo(
+    () => parseSendAmountNanos(sendAmountStr),
+    [sendAmountStr],
+  );
+  const balanceNanosBig = useMemo(() => {
+    if (!balance?.trim()) return null;
+    try {
+      return BigInt(balance);
+    } catch {
+      return null;
+    }
+  }, [balance]);
+  const sendExceedsBalance =
+    sendAmountNanosParsed !== null &&
+    balanceNanosBig !== null &&
+    sendAmountNanosParsed > balanceNanosBig;
 
   const dropdown = menuMounted ? (
     <div
@@ -500,134 +700,262 @@ export function ConnectButton({
         }}
       />
 
+      {did ? (
+        <div style={{ padding: "14px 16px 10px" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: palette.muted, marginBottom: 8 }}>DID</div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-start",
+              gap: 4,
+              minWidth: 0,
+              width: "100%",
+              overflow: "hidden",
+            }}
+          >
+            <span
+              style={{
+                flex: "0 1 auto",
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: `calc(100% - ${MENU_ICON_GROUP_RESERVE_PX}px)`,
+                fontFamily: "ui-monospace, monospace",
+                fontSize: 12,
+                color: palette.text,
+              }}
+            >
+              {truncateDidMenu(did)}
+            </span>
+            <div style={{ display: "flex", gap: 2, flexShrink: 0, alignItems: "center" }}>
+              <button
+                type="button"
+                title={copyDidFeedback ? "Copied" : "Copy DID"}
+                onClick={() => void handleCopyDid()}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: MENU_ICON_BTN_PX,
+                  height: MENU_ICON_BTN_PX,
+                  borderRadius: 6,
+                  border: `1px solid ${palette.border}`,
+                  background: palette.surface2,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                <IconClipboard color={copyDidFeedback ? AUTHWARDS_UI.accent : palette.muted} />
+              </button>
+              <button
+                type="button"
+                title="Open DID on explorer"
+                onClick={openExplorerDidObject}
+                disabled={!did?.trim()}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: MENU_ICON_BTN_PX,
+                  height: MENU_ICON_BTN_PX,
+                  borderRadius: 6,
+                  border: `1px solid ${palette.border}`,
+                  background: palette.surface2,
+                  cursor: did?.trim() ? "pointer" : "not-allowed",
+                  padding: 0,
+                  opacity: did?.trim() ? 1 : 0.45,
+                }}
+              >
+                <IconExternalLink color={palette.muted} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {did ? (
+        <div style={{ height: 1, background: palette.border, margin: "0 16px" }} />
+      ) : null}
+
       <div style={{ padding: "14px 16px 10px" }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: palette.muted, marginBottom: 8 }}>Wallet</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-start",
+            gap: 4,
+            width: "100%",
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <span
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flex: "0 1 auto",
+              minWidth: 0,
+              maxWidth: walletAddress
+                ? `calc(100% - ${MENU_ICON_GROUP_RESERVE_PX}px)`
+                : "100%",
+              fontFamily: "ui-monospace, monospace",
+              fontSize: 12,
+              color: palette.text,
+              opacity: walletAddress ? 1 : 0.5,
+            }}
+          >
             {walletAddress ? truncateAddress(walletAddress) : "—"}
           </span>
           {walletAddress ? (
-            <button
-              type="button"
-              onClick={() => void handleCopyAddr()}
-              style={{
-                border: "none",
-                background: "transparent",
-                color: AUTHWARDS_UI.accent,
-                fontSize: 11,
-                cursor: "pointer",
-                padding: 0,
-              }}
-            >
-              {copyAddrFeedback ? "Copied!" : "Copy"}
-            </button>
-          ) : null}
-          {walletAddress ? (
-            <button
-              type="button"
-              onClick={openExplorerAddr}
-              title="Explorer"
-              style={{
-                border: "none",
-                background: "transparent",
-                padding: 2,
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                color: palette.muted,
-              }}
-              aria-label="Open address on IOTA Explorer"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
-              </svg>
-            </button>
+            <div style={{ display: "flex", gap: 2, flexShrink: 0, alignItems: "center" }}>
+              <button
+                type="button"
+                title={copyAddrFeedback ? "Copied" : "Copy address"}
+                onClick={() => void handleCopyAddr()}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: MENU_ICON_BTN_PX,
+                  height: MENU_ICON_BTN_PX,
+                  borderRadius: 6,
+                  border: `1px solid ${palette.border}`,
+                  background: palette.surface2,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                <IconClipboard color={copyAddrFeedback ? AUTHWARDS_UI.accent : palette.muted} />
+              </button>
+              <button
+                type="button"
+                title="Open address on explorer"
+                onClick={openExplorerWalletAddr}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: MENU_ICON_BTN_PX,
+                  height: MENU_ICON_BTN_PX,
+                  borderRadius: 6,
+                  border: `1px solid ${palette.border}`,
+                  background: palette.surface2,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                <IconExternalLink color={palette.muted} />
+              </button>
+            </div>
           ) : null}
         </div>
-        {showBalance ? (
-          <div style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: palette.text }}>
-            <span style={{ color: palette.muted, fontWeight: 600, marginRight: 6 }}>Balance</span>
-            {balanceLoading ? (
-              <span
+        {showBalance || walletAddress ? (
+          <div
+            style={{
+              marginTop: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              width: "100%",
+              minWidth: 0,
+            }}
+          >
+            <div
+              style={{
+                flex: "1 1 0%",
+                minWidth: 0,
+                fontSize: 13,
+                fontWeight: 600,
+                color: palette.text,
+              }}
+            >
+              {showBalance ? (
+                <>
+                  <span style={{ color: palette.muted, fontWeight: 600, marginRight: 6 }}>Balance</span>
+                  {balanceLoading ? (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        verticalAlign: "middle",
+                        height: 16,
+                        width: 96,
+                        borderRadius: 4,
+                        background: `linear-gradient(90deg, ${palette.surface} 0%, ${palette.border} 50%, ${palette.surface} 100%)`,
+                        backgroundSize: "200% 100%",
+                        animation: "connectBtnShimmer 1.1s ease-in-out infinite",
+                      }}
+                    />
+                  ) : (
+                    formatIotaFromNanos(balance)
+                  )}
+                </>
+              ) : null}
+            </div>
+            {walletAddress ? (
+              <div
                 style={{
-                  display: "inline-block",
-                  verticalAlign: "middle",
-                  height: 16,
-                  width: 96,
-                  borderRadius: 4,
-                  background: `linear-gradient(90deg, ${palette.surface} 0%, ${palette.border} 50%, ${palette.surface} 100%)`,
-                  backgroundSize: "200% 100%",
-                  animation: "connectBtnShimmer 1.1s ease-in-out infinite",
+                  display: "flex",
+                  flexShrink: 0,
+                  gap: 6,
+                  minWidth: 0,
                 }}
-              />
-            ) : (
-              formatIotaFromNanos(balance)
-            )}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setSendError(null);
+                    setSendSuccessInfo(null);
+                    setSendOpen(true);
+                    if (walletAddress) void getBalance(walletAddress);
+                  }}
+                  style={{
+                    borderRadius: 8,
+                    padding: "5px 10px",
+                    border: `1px solid ${AUTHWARDS_UI.accent}`,
+                    background: palette.surface2,
+                    color: palette.text,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    cursor: "pointer",
+                    fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
+                  }}
+                >
+                  SEND
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setReceiveOpen(true);
+                  }}
+                  style={{
+                    borderRadius: 8,
+                    padding: "5px 10px",
+                    border: `1px solid ${AUTHWARDS_UI.accent}`,
+                    background: palette.surface2,
+                    color: palette.text,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    cursor: "pointer",
+                    fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
+                  }}
+                >
+                  RECEIVE
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
 
-      {did ? (
-        <>
-          <div style={{ height: 1, background: palette.border, margin: "0 16px" }} />
-          <div style={{ padding: "14px 16px 10px" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: palette.muted, marginBottom: 8 }}>DID</div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 8,
-                fontFamily: "ui-monospace, monospace",
-                fontSize: 11,
-                color: palette.muted,
-                wordBreak: "break-all",
-              }}
-            >
-              <span style={{ flex: 1, minWidth: 0 }}>{did}</span>
-              <div style={{ display: "flex", flexShrink: 0, gap: 4, alignItems: "center" }}>
-                <button
-                  type="button"
-                  onClick={() => void handleCopyDid()}
-                  style={{
-                    border: "none",
-                    background: AUTHWARDS_UI_RGBA.accent15,
-                    color: AUTHWARDS_UI.accent,
-                    borderRadius: 6,
-                    padding: "4px 8px",
-                    fontSize: 10,
-                    cursor: "pointer",
-                  }}
-                >
-                  {copyDidFeedback ? "Copied!" : "Copy"}
-                </button>
-                {didObjectHex ? (
-                  <button
-                    type="button"
-                    onClick={openExplorerDidObject}
-                    title="Explorer (object)"
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      padding: 2,
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      color: palette.muted,
-                    }}
-                    aria-label="Open DID object on IOTA Explorer"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
-                    </svg>
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </>
-      ) : null}
-
-      {manageIdentitiesUrl ? (
+      {manageIdentitiesUrl && !hideDashboardLink ? (
         <>
           <div style={{ height: 1, background: palette.border, margin: "0 16px" }} />
           <div style={{ padding: "8px 8px 4px" }}>
@@ -785,15 +1113,332 @@ export function ConnectButton({
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            fontFamily: "ui-monospace, monospace",
+            fontFamily: useNameOnConnectButton
+              ? "system-ui, -apple-system, Segoe UI, sans-serif"
+              : "ui-monospace, monospace",
             fontWeight: 500,
             fontSize: Math.max(12, parseInt(sz.fontSize, 10) - 1),
           }}
         >
-          {displayDid}
+          {connectedButtonLabel}
         </span>
       </button>
       {typeof document !== "undefined" && createPortal(dropdown, document.body)}
+      {typeof document !== "undefined" && sendOpen
+        ? createPortal(
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: MODAL_Z,
+                backgroundColor: "rgba(0,0,0,0.55)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+              }}
+              onClick={() => {
+                if (sendBusy) return;
+                if (sendSuccessInfo) {
+                  setSendOpen(false);
+                  setSendSuccessInfo(null);
+                  return;
+                }
+                setSendOpen(false);
+              }}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="aw-send-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: "100%",
+                  maxWidth: 420,
+                  borderRadius: 14,
+                  border: `1px solid ${palette.dropdownBorder}`,
+                  backgroundColor: palette.dropdownBg,
+                  color: palette.text,
+                  padding: 20,
+                  boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
+                  fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
+                }}
+              >
+                {sendSuccessInfo ? (
+                  <>
+                    <h2 id="aw-send-title" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#34d399" }}>
+                      Payment sent
+                    </h2>
+                    <p style={{ marginTop: 16, fontSize: 14, lineHeight: 1.55, color: palette.text }}>
+                      Your transfer of{" "}
+                      <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>
+                        {formatIotaPreview(sendSuccessInfo.amountIota)} IOTA
+                      </span>{" "}
+                      to{" "}
+                      <span style={{ fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}>
+                        {truncateAddrPreview(sendSuccessInfo.to)}
+                      </span>{" "}
+                      was submitted successfully.
+                    </p>
+                    <p style={{ marginTop: 12, fontSize: 13, color: palette.muted }}>
+                      Transaction:{" "}
+                      <a
+                        href={explorerTxUrl(sendSuccessInfo.txHash, did ?? "")}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: AUTHWARDS_UI.accent, fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}
+                      >
+                        {truncateAddrPreview(sendSuccessInfo.txHash, 12, 12)}
+                      </a>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSendOpen(false);
+                        setSendSuccessInfo(null);
+                      }}
+                      style={{
+                        marginTop: 24,
+                        width: "100%",
+                        borderRadius: 10,
+                        padding: "12px 16px",
+                        border: "none",
+                        background: AUTHWARDS_UI.accent,
+                        color: AUTHWARDS_UI.onAccent,
+                        cursor: "pointer",
+                        fontSize: 15,
+                        fontWeight: 600,
+                      }}
+                    >
+                      OK
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h2 id="aw-send-title" style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                      Send IOTA
+                    </h2>
+                    <label style={{ display: "block", marginTop: 16 }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: palette.muted,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Recipient address
+                      </span>
+                      <input
+                        value={sendTo}
+                        onChange={(e) => setSendTo(e.target.value)}
+                        placeholder="0x…"
+                        autoComplete="off"
+                        disabled={sendBusy}
+                        style={{
+                          width: "100%",
+                          marginTop: 8,
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: `1px solid ${palette.border}`,
+                          backgroundColor: palette.surface2,
+                          color: palette.text,
+                          fontSize: 13,
+                          fontFamily: "ui-monospace, monospace",
+                          boxSizing: "border-box",
+                          opacity: sendBusy ? 0.7 : 1,
+                        }}
+                      />
+                    </label>
+                    <label style={{ display: "block", marginTop: 14 }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: palette.muted,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Amount (IOTA)
+                      </span>
+                      <input
+                        value={sendAmountStr}
+                        onChange={(e) => setSendAmountStr(e.target.value)}
+                        placeholder="0.00"
+                        inputMode="decimal"
+                        disabled={sendBusy}
+                        style={{
+                          width: "100%",
+                          marginTop: 8,
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: `1px solid ${palette.border}`,
+                          backgroundColor: palette.surface2,
+                          color: palette.text,
+                          fontSize: 14,
+                          boxSizing: "border-box",
+                          opacity: sendBusy ? 0.7 : 1,
+                        }}
+                      />
+                    </label>
+                    {previewSendOk && previewSendTo ? (
+                      <p style={{ marginTop: 14, fontSize: 13, color: palette.muted }}>
+                        Sending{" "}
+                        <span style={{ fontFamily: "ui-monospace, monospace", color: AUTHWARDS_UI.accent }}>
+                          {formatIotaPreview(previewSendAmount)}
+                        </span>{" "}
+                        IOTA to{" "}
+                        <span style={{ fontFamily: "ui-monospace, monospace", color: palette.text }}>
+                          {truncateAddrPreview(previewSendTo)}
+                        </span>
+                      </p>
+                    ) : null}
+                    {sendExceedsBalance ? (
+                      <p style={{ marginTop: 12, fontSize: 13, color: "#f87171", lineHeight: 1.45 }}>
+                        Amount exceeds your balance ({formatIotaFromNanos(balance)}). Reduce the amount or add
+                        funds.
+                      </p>
+                    ) : null}
+                    {sendError ? <p style={{ marginTop: 12, fontSize: 13, color: "#f87171" }}>{sendError}</p> : null}
+                    <div style={{ marginTop: 20, display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        disabled={sendBusy}
+                        onClick={() => setSendOpen(false)}
+                        style={{
+                          borderRadius: 10,
+                          padding: "8px 14px",
+                          border: `1px solid ${palette.border}`,
+                          background: "transparent",
+                          color: palette.muted,
+                          cursor: sendBusy ? "wait" : "pointer",
+                          fontSize: 14,
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={sendBusy || sendExceedsBalance}
+                        onClick={() => void submitSend()}
+                        style={{
+                          borderRadius: 10,
+                          padding: "8px 16px",
+                          border: "none",
+                          background: AUTHWARDS_UI.accent,
+                          color: AUTHWARDS_UI.onAccent,
+                          cursor: sendBusy || sendExceedsBalance ? "not-allowed" : "pointer",
+                          fontSize: 14,
+                          fontWeight: 600,
+                          opacity: sendExceedsBalance ? 0.55 : 1,
+                        }}
+                      >
+                        {sendBusy ? "Sending…" : "Confirm & Send"}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+      {typeof document !== "undefined" && receiveOpen && walletAddress
+        ? createPortal(
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: MODAL_Z,
+                backgroundColor: "rgba(0,0,0,0.55)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+              }}
+              onClick={() => setReceiveOpen(false)}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="aw-receive-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: "100%",
+                  maxWidth: 420,
+                  borderRadius: 14,
+                  border: `1px solid ${palette.dropdownBorder}`,
+                  backgroundColor: palette.dropdownBg,
+                  color: palette.text,
+                  padding: 24,
+                  boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
+                  fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
+                  textAlign: "center",
+                }}
+              >
+                <h2 id="aw-receive-title" style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                  Receive IOTA
+                </h2>
+                <div
+                  style={{
+                    marginTop: 20,
+                    display: "flex",
+                    justifyContent: "center",
+                    borderRadius: 12,
+                    background: "#ffffff",
+                    padding: 16,
+                  }}
+                >
+                  <QRCodeSVG value={walletAddress} size={200} bgColor="#ffffff" fgColor="#0f172a" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyAddr()}
+                  style={{
+                    marginTop: 16,
+                    width: "100%",
+                    borderRadius: 10,
+                    padding: "12px 14px",
+                    border: `1px solid ${palette.border}`,
+                    background: palette.surface2,
+                    color: AUTHWARDS_UI.accent,
+                    fontFamily: "ui-monospace, monospace",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {walletAddress}
+                </button>
+                <p style={{ marginTop: 14, fontSize: 13, color: palette.muted, lineHeight: 1.45 }}>
+                  Send IOTA to this address to fund your wallet
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReceiveOpen(false)}
+                  style={{
+                    marginTop: 16,
+                    width: "100%",
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    border: `1px solid ${palette.border}`,
+                    background: "transparent",
+                    color: palette.muted,
+                    fontSize: 14,
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

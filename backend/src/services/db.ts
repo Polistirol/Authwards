@@ -288,3 +288,14 @@ export async function updateAgentByDid(agentDid: string, patch: Partial<DbAgent>
   await writeDb(db);
   return true;
 }
+
+/** Removes the agent row and its logs. On-chain DID / wallet are unchanged. */
+export async function deleteAgentByDid(agentDid: string): Promise<boolean> {
+  const db = await readDb();
+  const i = db.agents.findIndex((a) => a.agentDid === agentDid);
+  if (i < 0) return false;
+  db.agents.splice(i, 1);
+  db.agentLogs = db.agentLogs.filter((l) => l.agentDid !== agentDid);
+  await writeDb(db);
+  return true;
+}

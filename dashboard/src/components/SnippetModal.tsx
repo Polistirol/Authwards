@@ -17,6 +17,10 @@ type SnippetProviderMeta = {
   fileType: string;
   fileName: string;
   content: Record<string, unknown> | string;
+  /** When true, only copy is offered (no download). */
+  copyOnly?: boolean;
+  /** cURL tab: pre-filled commands split for separate copy targets. */
+  curlDetail?: { status: string; transact: string };
 };
 
 type SnippetApiResponse = {
@@ -264,6 +268,24 @@ export default function SnippetModal({
     return providerToRawString(currentProvider);
   }, [currentProvider]);
 
+  const curlStatusDisplay = useMemo(() => {
+    if (!data || !currentProvider?.curlDetail) return "";
+    return maskTokenInText(
+      currentProvider.curlDetail.status,
+      data.agentToken ?? "",
+      tokenRevealed,
+    );
+  }, [data, currentProvider, tokenRevealed]);
+
+  const curlTransactDisplay = useMemo(() => {
+    if (!data || !currentProvider?.curlDetail) return "";
+    return maskTokenInText(
+      currentProvider.curlDetail.transact,
+      data.agentToken ?? "",
+      tokenRevealed,
+    );
+  }, [data, currentProvider, tokenRevealed]);
+
   if (!open) return null;
 
   const pending =
@@ -414,9 +436,11 @@ export default function SnippetModal({
                 <h3 className="text-lg font-semibold text-white">
                   {currentProvider.label}
                 </h3>
-                <p className="mt-1 text-sm text-slate-400">
-                  {currentProvider.description}
-                </p>
+                {currentProvider.description ? (
+                  <p className="mt-1 text-sm text-slate-400">
+                    {currentProvider.description}
+                  </p>
+                ) : null}
 
                 {tab === "arduino" ? (
                   <div className="mt-4 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
@@ -434,41 +458,106 @@ export default function SnippetModal({
                   </div>
                 ) : null}
 
-                <div className="relative mt-3">
-                  <div className="mb-2 flex justify-end">
-                    <button
-                      type="button"
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
-                      title={tokenRevealed ? "Hide token in code" : "Show token in code"}
-                      onClick={() => setTokenRevealed((v) => !v)}
-                    >
-                      {tokenRevealed ? <IconEyeOff /> : <IconEye />}
-                    </button>
+                {tab === "curl" && currentProvider.curlDetail && data ? (
+                  <div className="relative mt-3 space-y-6">
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
+                        title={tokenRevealed ? "Hide token in code" : "Show token in code"}
+                        onClick={() => setTokenRevealed((v) => !v)}
+                      >
+                        {tokenRevealed ? <IconEyeOff /> : <IconEye />}
+                      </button>
+                    </div>
+                    <p className="font-mono text-sm break-all text-slate-300">
+                      <span className="text-slate-500">BackendURL:</span>{" "}
+                      {trimSlash(data.platformUrl)}
+                    </p>
+                    <div>
+                      <p className="text-sm font-medium text-white">GET /bridge/status</p>
+                      <CodePreview code={curlStatusDisplay} className="mt-2" />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void copyText("curl-status", currentProvider.curlDetail!.status)
+                          }
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
+                          title={copyMain === "curl-status" ? "Copied" : "Copy"}
+                        >
+                          {copyMain === "curl-status" ? (
+                            <IconCheck className="h-5 w-5 text-aw-accent" />
+                          ) : (
+                            <IconClipboard />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">POST /bridge/transact.</p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Edit the transact <strong className="text-slate-300">to</strong> and{" "}
+                        <strong className="text-slate-300">amount</strong> before sending.
+                      </p>
+                      <CodePreview code={curlTransactDisplay} className="mt-2" />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void copyText("curl-transact", currentProvider.curlDetail!.transact)
+                          }
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
+                          title={copyMain === "curl-transact" ? "Copied" : "Copy"}
+                        >
+                          {copyMain === "curl-transact" ? (
+                            <IconCheck className="h-5 w-5 text-aw-accent" />
+                          ) : (
+                            <IconClipboard />
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <CodePreview code={displayCode} className="mt-0" />
-                  <div className="mt-2 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDownload}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-accent/40 bg-aw-accent/10 text-aw-accent hover:bg-aw-accent/20"
-                      title="Download file"
-                    >
-                      <IconDownload />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void copyText(copyKey, downloadCode)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
-                      title={copyMain === copyKey ? "Copied" : "Copy code"}
-                    >
-                      {copyMain === copyKey ? (
-                        <IconCheck className="h-5 w-5 text-aw-accent" />
-                      ) : (
-                        <IconClipboard />
+                ) : (
+                  <div className="relative mt-3">
+                    <div className="mb-2 flex justify-end">
+                      <button
+                        type="button"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
+                        title={tokenRevealed ? "Hide token in code" : "Show token in code"}
+                        onClick={() => setTokenRevealed((v) => !v)}
+                      >
+                        {tokenRevealed ? <IconEyeOff /> : <IconEye />}
+                      </button>
+                    </div>
+                    <CodePreview code={displayCode} className="mt-0" />
+                    <div className="mt-2 flex justify-end gap-2">
+                      {currentProvider.copyOnly ? null : (
+                        <button
+                          type="button"
+                          onClick={handleDownload}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-accent/40 bg-aw-accent/10 text-aw-accent hover:bg-aw-accent/20"
+                          title="Download file"
+                        >
+                          <IconDownload />
+                        </button>
                       )}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => void copyText(copyKey, downloadCode)}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
+                        title={copyMain === copyKey ? "Copied" : "Copy code"}
+                      >
+                        {copyMain === copyKey ? (
+                          <IconCheck className="h-5 w-5 text-aw-accent" />
+                        ) : (
+                          <IconClipboard />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </>
           ) : data ? (

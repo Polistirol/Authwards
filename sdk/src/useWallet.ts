@@ -13,6 +13,15 @@ export type WalletBalanceResponse = {
   nanos?: string;
 };
 
+/** Response from `POST /wallet/withdraw-from-agent` (sponsored gas; delegate → account wallet). */
+export type WithdrawFromDelegateResult = {
+  txHash: string;
+  from: string;
+  to: string;
+  amountNanos: string;
+  amountIota: number;
+};
+
 export type UseWalletResult = {
   loading: boolean;
   /** Last balance read with `getBalance` (nanos string from the API). */
@@ -24,6 +33,15 @@ export type UseWalletResult = {
     to: string;
     amount: number;
   }>;
+  /**
+   * Withdraw IOTA from a delegate wallet to the logged-in account wallet (`POST /wallet/withdraw-from-agent`).
+   * `amount` is in **nanos** unless `options.unit` is `"iota"`.
+   */
+  withdrawFromDelegate: (
+    agentDid: string,
+    amount: number,
+    options?: { unit?: "nanos" | "iota" },
+  ) => Promise<WithdrawFromDelegateResult>;
 };
 
 function trimTrailingSlash(url: string): string {
@@ -91,5 +109,43 @@ export function useWallet(): UseWalletResult {
     [backendUrl, token],
   );
 
-  return { loading, balance, getBalance, transferToAgent };
+  const withdrawFromDelegate = useCallback(
+    async (
+      agentDid: string,
+      amount: number,
+      options?: { unit?: "nanos" | "iota" },
+    ): Promise<WithdrawFromDelegateResult> => {
+      if (!token) throw new Error("Authentication required");
+      setLoading(true);
+      try {
+        const unit = options?.unit === "iota" ? "iota" : "nanos";
+        const res = await fetch(`${trimTrailingSlash(backendUrl)}/wallet/withdraw-from-agent`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ agentDid: agentDid.trim(), amount, unit }),
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          let msg = t || `HTTP ${res.status}`;
+          try {
+            const j = JSON.parse(t) as { error?: unknown; message?: unknown };
+            if (typeof j.message === "string" && j.message.trim()) msg = j.message;
+            else if (typeof j.error === "string") msg = j.error;
+          } catch {
+            /* use raw */
+          }
+          throw new Error(msg);
+        }
+        return (await res.json()) as WithdrawFromDelegateResult;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [backendUrl, token],
+  );
+
+  return { loading, balance, getBalance, transferToAgent, withdrawFromDelegate };
 }

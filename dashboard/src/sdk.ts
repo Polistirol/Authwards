@@ -1,8 +1,10 @@
 export {
   AuthwardsProvider,
+  ConnectButton,
   LoginModal,
   useAgent,
   useAuthwards,
+  useWallet,
 } from "../../sdk";
 
 export type {
@@ -13,6 +15,8 @@ export type {
   CreateAgentResult,
   AuthwardsConfig,
   User,
+  ConnectButtonProps,
+  UseWalletResult,
 } from "../../sdk";
 
 /** @deprecated Use `AuthwardsProvider`. */

@@ -2,15 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Agent, AgentLog, AgentStatus } from "../sdk";
 
-import { IconArrowTopRightOnSquare, IconCheck, IconClipboard } from "./icons";
+import { nanosToIotaString } from "../lib/units";
+
+import { IconArrowTopRightOnSquare, IconCheck, IconClipboard, IconTrash } from "./icons";
 
 type AgentCardProps = {
   agent: Agent;
   backendUrl: string;
+  /** Bumps when the dashboard invalidates cached balances (funding, withdraw, etc.). */
+  agentBalanceEpoch: number;
+  token: string | null;
+  /** Called after a successful withdraw so balances / agent list stay in sync. */
+  onRefreshAgent?: () => void;
   logs: AgentLog[];
   onOpenSnippet: () => void;
   onOpenFund: () => void;
   onRevoke: () => Promise<boolean>;
+  onDeleteAgent: (agentDid: string) => Promise<boolean>;
   onActivate: (agentDid: string) => Promise<{ ok: boolean; error?: string }>;
   fetchAgentLogs: (agentDid: string) => Promise<void>;
 };
@@ -144,10 +152,14 @@ function logTypeClass(type: string): string {
 export default function AgentCard({
   agent,
   backendUrl,
+  agentBalanceEpoch,
+  token,
+  onRefreshAgent,
   logs,
   onOpenSnippet,
   onOpenFund,
   onRevoke,
+  onDeleteAgent,
   onActivate,
   fetchAgentLogs,
 }: AgentCardProps) {
@@ -160,6 +172,17 @@ export default function AgentCard({
   const [activateConfirm, setActivateConfirm] = useState(false);
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState<string | null>(null);
+
+  const [revokeModal, setRevokeModal] = useState<null | "balance" | "confirm">(null);
+  const [revokeBalanceNanos, setRevokeBalanceNanos] = useState<bigint | null>(null);
+  const [revokeOpening, setRevokeOpening] = useState(false);
+  const [withdrawAllBusy, setWithdrawAllBusy] = useState(false);
+  const [revokeExecuting, setRevokeExecuting] = useState(false);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const status = effectiveStatus(agent);
   const caps = permissionCaps(agent);
@@ -197,12 +220,10 @@ export default function AgentCard({
     }
 
     void load();
-    const id = setInterval(() => void load(), 15_000);
     return () => {
       cancelled = true;
-      clearInterval(id);
     };
-  }, [agent.walletAddress, trimBackend]);
+  }, [agent.walletAddress, trimBackend, agentBalanceEpoch]);
 
   async function copyToClipboard(
     text: string,
@@ -228,15 +249,132 @@ export default function AgentCard({
     }
   }
 
-  async function handleRevoke(): Promise<void> {
-    if (
-      !window.confirm(
-        "Are you sure you want to revoke this delegate? This cannot be undone.",
-      )
-    ) {
+  function closeRevokeModals(): void {
+    setRevokeModal(null);
+    setRevokeBalanceNanos(null);
+    setRevokeError(null);
+  }
+
+  async function openRevokeFlow(): Promise<void> {
+    setRevokeError(null);
+    setRevokeBalanceNanos(null);
+    const addr = agent.walletAddress?.trim();
+    if (!addr) {
+      setRevokeModal("confirm");
       return;
     }
-    await onRevoke();
+    setRevokeOpening(true);
+    try {
+      const res = await fetch(
+        `${trimBackend()}/wallet/balance/${encodeURIComponent(addr)}`,
+      );
+      const json = (await res.json()) as {
+        balanceNanos?: string;
+        balance?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setRevokeModal("confirm");
+        return;
+      }
+      const raw = json.balanceNanos ?? json.balance;
+      const nanos = BigInt(raw !== undefined && raw !== null ? String(raw) : "0");
+      if (nanos > 0n) {
+        setRevokeBalanceNanos(nanos);
+        setRevokeModal("balance");
+      } else {
+        setRevokeModal("confirm");
+      }
+    } catch {
+      setRevokeModal("confirm");
+    } finally {
+      setRevokeOpening(false);
+    }
+  }
+
+  async function withdrawAllBeforeRevoke(): Promise<void> {
+    if (!token) {
+      setRevokeError("You need to be signed in to withdraw.");
+      return;
+    }
+    const addr = agent.walletAddress?.trim();
+    if (!addr) return;
+    setWithdrawAllBusy(true);
+    setRevokeError(null);
+    try {
+      const balRes = await fetch(
+        `${trimBackend()}/wallet/balance/${encodeURIComponent(addr)}`,
+      );
+      const balJson = (await balRes.json()) as {
+        balanceNanos?: string;
+        balance?: string;
+      };
+      if (!balRes.ok) {
+        setRevokeError("Could not read delegate balance.");
+        return;
+      }
+      const raw = balJson.balanceNanos ?? balJson.balance;
+      const nanos = BigInt(raw !== undefined && raw !== null ? String(raw) : "0");
+      if (nanos <= 0n) {
+        setRevokeModal("confirm");
+        return;
+      }
+      const wRes = await fetch(`${trimBackend()}/wallet/withdraw-from-agent`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ agentDid: agent.agentDid, amount: Number(nanos) }),
+      });
+      const wJson: unknown = await wRes.json();
+      if (!wRes.ok) {
+        let msg = "Withdraw failed.";
+        if (typeof wJson === "object" && wJson) {
+          const o = wJson as { message?: unknown; error?: unknown };
+          if (typeof o.message === "string" && o.message.trim()) msg = o.message;
+          else if (o.error != null) msg = String(o.error);
+        }
+        setRevokeError(msg);
+        return;
+      }
+      onRefreshAgent?.();
+      setRevokeModal("confirm");
+    } catch (e) {
+      setRevokeError(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setWithdrawAllBusy(false);
+    }
+  }
+
+  async function executeRevoke(): Promise<void> {
+    setRevokeExecuting(true);
+    setRevokeError(null);
+    try {
+      const ok = await onRevoke();
+      if (ok) {
+        onRefreshAgent?.();
+        closeRevokeModals();
+      } else setRevokeError("Revocation failed. Try again.");
+    } finally {
+      setRevokeExecuting(false);
+    }
+  }
+
+  async function executeDeleteFromDashboard(): Promise<void> {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const ok = await onDeleteAgent(agent.agentDid);
+      if (ok) {
+        setDeleteModalOpen(false);
+        onRefreshAgent?.();
+      } else {
+        setDeleteError("Could not remove this delegate. Try again.");
+      }
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   function openActivateModal(): void {
@@ -428,7 +566,22 @@ export default function AgentCard({
         </div>
       </div>
 
-      {status === "revoked" ? null : (
+      {status === "revoked" ? (
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-label="Remove delegate from dashboard"
+            title="Remove from dashboard"
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteModalOpen(true);
+            }}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-500/55 bg-red-500/10 text-red-300 transition hover:bg-red-500/20"
+          >
+            <IconTrash className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
         <div className="mt-5 flex flex-wrap gap-2">
           {status === "created" ? (
             <button
@@ -445,7 +598,7 @@ export default function AgentCard({
               onClick={onOpenSnippet}
               className="rounded-lg border border-aw-accent/40 bg-aw-accent/10 px-4 py-2 text-sm font-medium text-aw-accent hover:bg-aw-accent/20"
             >
-              View Snippet
+              View Snippets
             </button>
           ) : (
             <button
@@ -453,7 +606,7 @@ export default function AgentCard({
               onClick={onOpenSnippet}
               className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
             >
-              View Snippet
+              View Snippets
             </button>
           )}
           <button
@@ -462,15 +615,16 @@ export default function AgentCard({
             disabled={!agent.walletAddress}
             className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Fund delegate
+            Manage funds
           </button>
           {status === "active" ? (
             <button
               type="button"
-              onClick={() => void handleRevoke()}
-              className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20"
+              disabled={revokeOpening}
+              onClick={() => void openRevokeFlow()}
+              className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Revoke
+              {revokeOpening ? "Checking…" : "Revoke"}
             </button>
           ) : null}
         </div>
@@ -508,6 +662,177 @@ export default function AgentCard({
         ) : null}
       </div>
         </>
+      ) : null}
+
+      {deleteModalOpen ? (
+        <div
+          className="fixed inset-0 z-[185] flex items-center justify-center bg-black/65 p-4"
+          role="presentation"
+          onClick={() => !deleteBusy && setDeleteModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-delegate-title"
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-aw-panel p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="delete-delegate-title"
+              className="text-lg font-semibold text-white"
+            >
+              Remove from dashboard?
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-300">
+              This will only remove{" "}
+              <span className="font-medium text-white">{displayName}</span> from your Authwards dashboard. Its
+              addresses and transaction history will still remain on-chain.
+            </p>
+            {deleteError ? (
+              <p className="mt-3 text-sm text-red-400">{deleteError}</p>
+            ) : null}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => setDeleteModalOpen(false)}
+                className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => void executeDeleteFromDashboard()}
+                className="rounded-lg border border-red-500/50 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/25"
+              >
+                {deleteBusy ? "Removing…" : "Delete from dashboard"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {revokeModal === "balance" && revokeBalanceNanos !== null && revokeBalanceNanos > 0n ? (
+        <div
+          className="fixed inset-0 z-[185] flex items-center justify-center bg-black/65 p-4"
+          role="presentation"
+          onClick={() =>
+            !withdrawAllBusy && closeRevokeModals()
+          }
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="revoke-balance-title"
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-aw-panel p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="revoke-balance-title"
+              className="text-lg font-semibold text-white"
+            >
+              Revoke delegate
+            </h2>
+            <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-300">
+              <p>
+                This delegate&apos;s wallet still holds{" "}
+                <span className="font-mono text-aw-accent">
+                  {nanosToIotaString(revokeBalanceNanos)}
+                </span>{" "}
+                IOTA.
+              </p>
+              <p className="text-slate-400">
+                Once revoked, this delegate can no longer sign transactions or transfer funds on your
+                behalf. If you need those tokens back in your account wallet, withdraw the full balance
+                first. You can also revoke anyway and leave the funds on this address.
+              </p>
+              <p className="text-slate-200">
+                Withdraw all available funds to your wallet now?
+              </p>
+            </div>
+            {revokeError ? (
+              <p className="mt-3 text-sm text-red-400">{revokeError}</p>
+            ) : null}
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+              <button
+                type="button"
+                disabled={withdrawAllBusy}
+                onClick={closeRevokeModals}
+                className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={withdrawAllBusy}
+                onClick={() => {
+                  setRevokeError(null);
+                  setRevokeModal("confirm");
+                }}
+                className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+              >
+                Revoke without withdrawing
+              </button>
+              <button
+                type="button"
+                disabled={withdrawAllBusy || !token}
+                onClick={() => void withdrawAllBeforeRevoke()}
+                className="rounded-lg bg-aw-accent px-4 py-2 text-sm font-semibold text-aw-on-accent hover:bg-aw-accent-hover disabled:opacity-50"
+              >
+                {withdrawAllBusy ? "Withdrawing…" : "Withdraw all"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {revokeModal === "confirm" ? (
+        <div
+          className="fixed inset-0 z-[185] flex items-center justify-center bg-black/65 p-4"
+          role="presentation"
+          onClick={() => !revokeExecuting && closeRevokeModals()}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="revoke-confirm-title"
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-aw-panel p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="revoke-confirm-title"
+              className="text-lg font-semibold text-white"
+            >
+              Revoke {displayName}?
+            </h2>
+            <p className="mt-3 text-sm text-slate-400">
+              This cannot be undone. The delegate will stop working in your workflows and can no longer
+              act on your behalf.
+            </p>
+            {revokeError ? (
+              <p className="mt-3 text-sm text-red-400">{revokeError}</p>
+            ) : null}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={revokeExecuting}
+                onClick={closeRevokeModals}
+                className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={revokeExecuting}
+                onClick={() => void executeRevoke()}
+                className="rounded-lg border border-red-500/50 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/25"
+              >
+                {revokeExecuting ? "Revoking…" : "Revoke delegate"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {activateOpen ? (

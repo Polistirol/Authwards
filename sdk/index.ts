@@ -8,7 +8,11 @@ export { useAuthwards } from "./src/useAuthwards";
 export type { UseAuthwardsResult } from "./src/useAuthwards";
 
 export { useWallet } from "./src/useWallet";
-export type { UseWalletResult, WalletBalanceResponse } from "./src/useWallet";
+export type {
+  UseWalletResult,
+  WalletBalanceResponse,
+  WithdrawFromDelegateResult,
+} from "./src/useWallet";
 
 export { useAgent } from "./src/useAgent";
 export type { CreateAgentInput, CreateAgentResult, UseAgentResult } from "./src/useAgent";
