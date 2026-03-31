@@ -163,8 +163,8 @@ export default function AgentCard({
   onActivate,
   fetchAgentLogs,
 }: AgentCardProps) {
-  const [copiedField, setCopiedField] = useState<"did" | "wallet" | null>(null);
-  const [cardExpanded, setCardExpanded] = useState(true);
+  const [copiedField, setCopiedField] = useState<"did" | "wallet" | "delegateToken" | null>(null);
+  const [cardExpanded, setCardExpanded] = useState(false);
   const [balanceNanos, setBalanceNanos] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -227,7 +227,7 @@ export default function AgentCard({
 
   async function copyToClipboard(
     text: string,
-    field: "did" | "wallet",
+    field: "did" | "wallet" | "delegateToken",
   ): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
@@ -413,6 +413,7 @@ export default function AgentCard({
 
   const walletAddr = agent.walletAddress?.trim() ?? "";
   const permitId = agent.permitObjectId?.trim() ?? "";
+  const delegateToken = agent.agentToken?.trim() ?? "";
 
   return (
     <article
@@ -420,28 +421,36 @@ export default function AgentCard({
       aria-label="Delegate card"
     >
       <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/10 pb-4">
-        <div className="min-w-0 flex-1">
+        <button
+          type="button"
+          aria-expanded={cardExpanded}
+          aria-label={cardExpanded ? "Collapse delegate card" : "Expand delegate card"}
+          onClick={() => setCardExpanded((v) => !v)}
+          className="min-w-0 flex-1 rounded-lg text-left transition hover:bg-white/5"
+        >
           <div className="flex min-w-0 items-center gap-2">
             <h3 className="truncate text-lg font-semibold text-white">
               {displayName}
             </h3>
-            {!cardExpanded ? <StatusLed status={status} /> : null}
+            <StatusLed status={status} />
           </div>
           {cardExpanded && agent.description?.trim() ? (
             <p className="mt-2 text-sm leading-relaxed text-slate-400">
               {agent.description.trim()}
             </p>
           ) : null}
-        </div>
-        <button
-          type="button"
-          aria-expanded={cardExpanded}
-          aria-label={cardExpanded ? "Collapse delegate card" : "Expand delegate card"}
-          onClick={() => setCardExpanded((v) => !v)}
-          className="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
-        >
-          <ChevronDownIcon className={`h-5 w-5 transition-transform ${cardExpanded ? "rotate-180" : ""}`} />
         </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            aria-expanded={cardExpanded}
+            aria-label={cardExpanded ? "Collapse delegate card" : "Expand delegate card"}
+            onClick={() => setCardExpanded((v) => !v)}
+            className="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+          >
+            <ChevronDownIcon className={`h-5 w-5 transition-transform ${cardExpanded ? "rotate-180" : ""}`} />
+          </button>
+        </div>
       </div>
 
       {cardExpanded ? (
@@ -528,10 +537,30 @@ export default function AgentCard({
           </ul>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase text-slate-500">Created</p>
-          <p className="mt-1 text-sm text-slate-200">
-            {formatDate(agent.createdAt)}
-          </p>
+          <p className="text-xs font-medium uppercase text-slate-500">Delegate token</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <code
+              className="min-w-0 break-all font-mono text-sm text-aw-accent"
+              title={delegateToken || undefined}
+            >
+              {delegateToken ? formatDelegateToken(delegateToken) : "—"}
+            </code>
+            {delegateToken ? (
+              <button
+                type="button"
+                onClick={() => void copyToClipboard(delegateToken, "delegateToken")}
+                aria-label="Copy delegate token"
+                title={copiedField === "delegateToken" ? "Copied" : "Copy delegate token"}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-200 hover:bg-white/10"
+              >
+                {copiedField === "delegateToken" ? (
+                  <IconCheck className="h-3.5 w-3.5 text-aw-accent" />
+                ) : (
+                  <IconClipboard className="h-3.5 w-3.5" />
+                )}
+              </button>
+            ) : null}
+          </div>
           <p className="mt-3 text-xs font-medium uppercase text-slate-500">
             Delegate permit ID
           </p>
@@ -557,7 +586,11 @@ export default function AgentCard({
           </div>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase text-slate-500">Activated</p>
+          <p className="text-xs font-medium uppercase text-slate-500">Created</p>
+          <p className="mt-1 text-sm text-slate-200">
+            {formatDate(agent.createdAt)}
+          </p>
+          <p className="mt-3 text-xs font-medium uppercase text-slate-500">Activated</p>
           <p className="mt-1 text-sm text-slate-200">
             {status === "active" && agent.activatedAt
               ? formatDate(agent.activatedAt)
@@ -598,7 +631,7 @@ export default function AgentCard({
               onClick={onOpenSnippet}
               className="rounded-lg border border-aw-accent/40 bg-aw-accent/10 px-4 py-2 text-sm font-medium text-aw-accent hover:bg-aw-accent/20"
             >
-              View Snippets
+              Connect
             </button>
           ) : (
             <button
@@ -606,7 +639,7 @@ export default function AgentCard({
               onClick={onOpenSnippet}
               className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
             >
-              View Snippets
+              Connect
             </button>
           )}
           <button
@@ -887,6 +920,21 @@ export default function AgentCard({
   );
 }
 
+function formatDelegateToken(token: string): string {
+  const t = token.trim();
+  if (!t) return t;
+  if (t.startsWith("agt_")) {
+    const body = t.slice(4);
+    if (body.length > 7) {
+      return `agt_${body.slice(0, 2)}...${body.slice(-5)}`;
+    }
+  }
+  if (t.length > 11) {
+    return `${t.slice(0, 6)}...${t.slice(-5)}`;
+  }
+  return t;
+}
+
 function profileBadge(profile: string): string {
   switch (profile) {
     case "readonly":
@@ -1113,7 +1161,7 @@ function StatusLed({ status }: { status: AgentStatus }) {
   if (status === "created" || status === "pending_activation") {
     return (
       <span
-        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.75)]"
+        className="inline-block h-3.5 w-3.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)]"
         title="Not activated"
         aria-hidden
       />
@@ -1122,7 +1170,7 @@ function StatusLed({ status }: { status: AgentStatus }) {
   if (status === "active") {
     return (
       <span
-        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]"
+        className="inline-block h-3.5 w-3.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]"
         title="Active"
         aria-hidden
       />
@@ -1130,7 +1178,7 @@ function StatusLed({ status }: { status: AgentStatus }) {
   }
   return (
     <span
-      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.65)]"
+      className="inline-block h-3.5 w-3.5 shrink-0 rounded-full bg-red-400 shadow-[0_0_12px_rgba(248,113,113,0.7)]"
       title="Revoked"
       aria-hidden
     />

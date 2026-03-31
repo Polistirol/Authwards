@@ -46,31 +46,6 @@ function trimSlash(u: string): string {
   return u.replace(/\/+$/, "");
 }
 
-function IconEye({ className = "h-5 w-5" }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-      />
-    </svg>
-  );
-}
-
-function IconEyeOff({ className = "h-5 w-5" }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-      />
-    </svg>
-  );
-}
-
 function IconDownload({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg className={className} aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -83,37 +58,6 @@ function IconDownload({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
-function MaskedToken({
-  token,
-  revealed,
-}: {
-  token: string;
-  revealed: boolean;
-}) {
-  const masked = useMemo(
-    () => "•".repeat(Math.max(token.length, 8)),
-    [token.length],
-  );
-  return (
-    <span className="relative flex min-h-[1.25rem] font-mono text-sm break-all">
-      <span
-        className={`recovery-phrase-crossfade ${
-          revealed ? "pointer-events-none absolute inset-0 opacity-0" : "relative opacity-100"
-        }`}
-      >
-        {masked}
-      </span>
-      <span
-        className={`recovery-phrase-crossfade text-aw-text selection:bg-aw-accent/30 ${
-          revealed ? "relative opacity-100" : "pointer-events-none absolute inset-0 opacity-0"
-        }`}
-      >
-        {token}
-      </span>
-    </span>
-  );
-}
-
 /** Plain text preview — no custom syntax highlighter (avoids heavy DOM / edge-case loops). */
 function CodePreview({ code, className = "mt-3" }: { code: string; className?: string }) {
   return (
@@ -123,12 +67,6 @@ function CodePreview({ code, className = "mt-3" }: { code: string; className?: s
       {code}
     </pre>
   );
-}
-
-function maskTokenInText(text: string, token: string, revealed: boolean): string {
-  if (revealed || !token) return text;
-  const mask = "•".repeat(Math.max(token.length, 8));
-  return text.split(token).join(mask);
 }
 
 function providerToRawString(p: SnippetProviderMeta): string {
@@ -168,7 +106,6 @@ export default function SnippetModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<SnippetApiResponse | null>(null);
-  const [tokenRevealed, setTokenRevealed] = useState(false);
   const [copyMain, setCopyMain] = useState<string | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -177,7 +114,6 @@ export default function SnippetModal({
     if (!open) {
       setData(null);
       setError(null);
-      setTokenRevealed(false);
       setTab("n8n");
       setLoading(false);
       return;
@@ -259,9 +195,8 @@ export default function SnippetModal({
 
   const displayCode = useMemo(() => {
     if (!data || !currentProvider) return "";
-    const raw = providerToRawString(currentProvider);
-    return maskTokenInText(raw, data.agentToken, tokenRevealed);
-  }, [data, currentProvider, tokenRevealed]);
+    return providerToRawString(currentProvider);
+  }, [data, currentProvider]);
 
   const downloadCode = useMemo(() => {
     if (!currentProvider) return "";
@@ -269,22 +204,14 @@ export default function SnippetModal({
   }, [currentProvider]);
 
   const curlStatusDisplay = useMemo(() => {
-    if (!data || !currentProvider?.curlDetail) return "";
-    return maskTokenInText(
-      currentProvider.curlDetail.status,
-      data.agentToken ?? "",
-      tokenRevealed,
-    );
-  }, [data, currentProvider, tokenRevealed]);
+    if (!currentProvider?.curlDetail) return "";
+    return currentProvider.curlDetail.status;
+  }, [currentProvider]);
 
   const curlTransactDisplay = useMemo(() => {
-    if (!data || !currentProvider?.curlDetail) return "";
-    return maskTokenInText(
-      currentProvider.curlDetail.transact,
-      data.agentToken ?? "",
-      tokenRevealed,
-    );
-  }, [data, currentProvider, tokenRevealed]);
+    if (!currentProvider?.curlDetail) return "";
+    return currentProvider.curlDetail.transact;
+  }, [currentProvider]);
 
   if (!open) return null;
 
@@ -379,10 +306,9 @@ export default function SnippetModal({
               <div className="relative mt-1 flex items-start gap-2">
                 <div className="min-h-[1.5rem] min-w-0 flex-1 rounded-lg border border-aw-border/90 bg-aw-inset px-3 py-2">
                   {data?.agentToken ? (
-                    <MaskedToken
-                      token={data.agentToken}
-                      revealed={tokenRevealed}
-                    />
+                    <span className="break-all font-mono text-sm text-aw-text selection:bg-aw-accent/30">
+                      {data.agentToken}
+                    </span>
                   ) : (
                     <span className="text-slate-500">—</span>
                   )}
@@ -390,16 +316,16 @@ export default function SnippetModal({
                 <button
                   type="button"
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
-                  title={tokenRevealed ? "Hide token" : "Show token"}
-                  onClick={() => setTokenRevealed((v) => !v)}
+                  title={copyMain === "agent-token" ? "Copied" : "Copy delegate token"}
+                  onClick={() => data?.agentToken && void copyText("agent-token", data.agentToken)}
                 >
-                  {tokenRevealed ? <IconEyeOff /> : <IconEye />}
+                  {copyMain === "agent-token" ? (
+                    <IconCheck className="h-5 w-5 text-aw-accent" />
+                  ) : (
+                    <IconClipboard />
+                  )}
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-slate-500">
-                The token is masked in the preview; download and copy from the block below use the
-                real token.
-              </p>
             </div>
             <div>
               <p className="text-xs uppercase text-slate-500">Status</p>
@@ -460,16 +386,6 @@ export default function SnippetModal({
 
                 {tab === "curl" && currentProvider.curlDetail && data ? (
                   <div className="relative mt-3 space-y-6">
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
-                        title={tokenRevealed ? "Hide token in code" : "Show token in code"}
-                        onClick={() => setTokenRevealed((v) => !v)}
-                      >
-                        {tokenRevealed ? <IconEyeOff /> : <IconEye />}
-                      </button>
-                    </div>
                     <p className="font-mono text-sm break-all text-slate-300">
                       <span className="text-slate-500">BackendURL:</span>{" "}
                       {trimSlash(data.platformUrl)}
@@ -521,16 +437,6 @@ export default function SnippetModal({
                   </div>
                 ) : (
                   <div className="relative mt-3">
-                    <div className="mb-2 flex justify-end">
-                      <button
-                        type="button"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-aw-border/80 bg-white/5 text-slate-300 hover:bg-white/10"
-                        title={tokenRevealed ? "Hide token in code" : "Show token in code"}
-                        onClick={() => setTokenRevealed((v) => !v)}
-                      >
-                        {tokenRevealed ? <IconEyeOff /> : <IconEye />}
-                      </button>
-                    </div>
                     <CodePreview code={displayCode} className="mt-0" />
                     <div className="mt-2 flex justify-end gap-2">
                       {currentProvider.copyOnly ? null : (

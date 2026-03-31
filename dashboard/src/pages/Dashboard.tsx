@@ -11,6 +11,7 @@ import { IconArrowTopRightOnSquare, IconCheck, IconClipboard } from "../componen
 import { explorerAddressUrl, explorerDidObjectUrl } from "../lib/explorer";
 import SnippetModal from "../components/SnippetModal";
 import TrustChain from "../components/TrustChain";
+import bannerAuthwards from "../assets/banner_authwards_white.png";
 
 /** Set to `true` to show the Trust Chain section (schema) below the delegate list. */
 const SHOW_TRUST_CHAIN_SECTION = false;
@@ -380,9 +381,7 @@ export default function Dashboard() {
 
       <header className="border-b border-white/10 px-6 py-4">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4">
-          <span className="text-sm font-semibold tracking-wide text-aw-accent">
-            Authwards
-          </span>
+          <img src={bannerAuthwards} alt="Authwards" className="h-9 w-auto" />
           <ConnectButton theme="dark" hideDashboardLink />
         </div>
       </header>

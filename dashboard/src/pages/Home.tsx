@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+import bannerAuthwardsWhite from "../assets/banner_authwards.png";
+//import logoAuthwards from "../assets/logo_authwards_medium_white.png";
 import { useAuthwards } from "../sdk";
 
 export default function Home() {
@@ -24,15 +26,17 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-aw-bg text-aw-text">
       <header className="border-b border-white/5 px-6 py-4">
-        <span className="text-sm font-semibold tracking-wide text-aw-accent">
-          Authwards
-        </span>
+        {/* <img src={logoAuthwards} alt="Authwards" className="h-8 w-auto" /> */}
       </header>
 
       <main className="mx-auto max-w-5xl px-6 pb-24 pt-16">
         <section className="text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
-            Authwards
+          <h1 className="flex justify-center">
+            <img
+              src={bannerAuthwardsWhite}
+              alt="Authwards"
+              className="h-auto w-full max-w-[620px]"
+            />
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
             Sign in with Google, GitHub, or Telegram. OAuth turns your account into an IOTA DID.
